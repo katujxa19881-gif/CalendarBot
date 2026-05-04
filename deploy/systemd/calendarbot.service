@@ -1,0 +1,16 @@
+[Unit]
+Description=CalendarBot Telegram service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/calendarbot
+ExecStart=/usr/bin/npm run start:prod
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/calendarbot/.env
+User=root
+
+[Install]
+WantedBy=multi-user.target
