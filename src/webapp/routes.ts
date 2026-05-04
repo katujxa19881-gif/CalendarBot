@@ -58,6 +58,14 @@ const adminListQuerySchema = z.object({
 const rejectBodySchema = z.object({
   comment: z.string().trim().max(1000).nullable().optional()
 });
+const actionCommentBodySchema = z.object({
+  comment: z.string().trim().max(1000).nullable().optional()
+});
+const adminRescheduleBodySchema = z.object({
+  start_at: z.string().datetime(),
+  end_at: z.string().datetime(),
+  comment: z.string().trim().max(1000).nullable().optional()
+});
 const patchSettingsBodySchema = z
   .object({
     workday_start_hour: z.number().int().optional(),
@@ -828,11 +836,21 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
       return;
     }
 
+    const parsedBody = actionCommentBodySchema.safeParse(request.body ?? {});
+    if (!parsedBody.success) {
+      reply.code(400).send({
+        ok: false,
+        error: "APPROVE_PAYLOAD_INVALID"
+      });
+      return;
+    }
+
     const requestId = String((request.params as { id?: string }).id ?? "");
     try {
       const updatedRequest = await approveMeetingRequestByAdmin({
         meetingRequestId: requestId,
-        adminTelegramId: session.user.telegramId
+        adminTelegramId: session.user.telegramId,
+        comment: parsedBody.data.comment ?? null
       });
 
       logEvent({
@@ -908,12 +926,22 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
       return;
     }
 
+    const parsedBody = actionCommentBodySchema.safeParse(request.body ?? {});
+    if (!parsedBody.success) {
+      reply.code(400).send({
+        ok: false,
+        error: "CANCEL_PAYLOAD_INVALID"
+      });
+      return;
+    }
+
     const requestId = String((request.params as { id?: string }).id ?? "");
     try {
       const updatedRequest = await cancelMeetingRequest({
         meetingRequestId: requestId,
         actorTelegramId: session.user.telegramId,
-        actorRole: JournalActorRole.ADMIN
+        actorRole: JournalActorRole.ADMIN,
+        comment: parsedBody.data.comment ?? null
       });
 
       logEvent({
@@ -943,7 +971,7 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
       return;
     }
 
-    const parsedBody = rescheduleBodySchema.safeParse(request.body);
+    const parsedBody = adminRescheduleBodySchema.safeParse(request.body);
     if (!parsedBody.success) {
       reply.code(400).send({
         ok: false,
@@ -969,7 +997,8 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
         actorTelegramId: session.user.telegramId,
         actorRole: JournalActorRole.ADMIN,
         newStartAt,
-        newEndAt
+        newEndAt,
+        comment: parsedBody.data.comment ?? null
       });
 
       logEvent({

@@ -194,7 +194,11 @@ async function createCalendarEvent(input: {
   });
 }
 
-export async function approveMeetingRequestByAdmin(input: { meetingRequestId: string; adminTelegramId: string }) {
+export async function approveMeetingRequestByAdmin(input: {
+  meetingRequestId: string;
+  adminTelegramId: string;
+  comment?: string | null;
+}) {
   const request = await prisma.meetingRequest.findUnique({
     where: {
       id: input.meetingRequestId
@@ -230,7 +234,7 @@ export async function approveMeetingRequestByAdmin(input: { meetingRequestId: st
     toStatus: MeetingRequestStatus.APPROVED,
     actorId: input.adminTelegramId,
     actorRole: JournalActorRole.ADMIN,
-    comment: null
+    comment: input.comment ?? null
   });
 
   await prisma.$transaction(async (tx) => {
@@ -263,6 +267,7 @@ export async function approveMeetingRequestByAdmin(input: { meetingRequestId: st
         actorId: input.adminTelegramId,
         actionType: JournalActionType.APPROVAL_CONFIRMED,
         details: {
+          comment: input.comment ?? null,
           source: "webapp_admin",
           channel: "webapp"
         },
@@ -285,7 +290,8 @@ export async function approveMeetingRequestByAdmin(input: { meetingRequestId: st
       "",
       `Номер заявки: ${formatRequestCode(request.createdAt)}`,
       `Тема: ${request.topic}`,
-      `Дата и время: ${formatDateRangeMoscow(request.startAt, request.endAt)}`
+      `Дата и время: ${formatDateRangeMoscow(request.startAt, request.endAt)}`,
+      ...(input.comment ? [`Комментарий: ${input.comment}`] : [])
     ].join("\n")
   });
 
@@ -364,6 +370,7 @@ export async function cancelMeetingRequest(input: {
   meetingRequestId: string;
   actorTelegramId: string;
   actorRole: "USER" | "ADMIN";
+  comment?: string | null;
 }) {
   const request = await prisma.meetingRequest.findUnique({
     where: {
@@ -427,6 +434,7 @@ export async function cancelMeetingRequest(input: {
         actorId: input.actorTelegramId,
         actionType: JournalActionType.CANCELLATION_COMPLETED,
         details: {
+          comment: input.comment ?? null,
           source: input.actorRole === JournalActorRole.ADMIN ? "webapp_admin" : "webapp_user",
           channel: "webapp"
         },
@@ -440,9 +448,14 @@ export async function cancelMeetingRequest(input: {
     BackgroundJobType.EMAIL_REMINDER
   ]);
 
+  const cancelLines = [`Заявка ${formatRequestCode(request.createdAt)} отменена.`];
+  if (input.comment) {
+    cancelLines.push(`Комментарий: ${input.comment}`);
+  }
+
   await sendTelegramMessage({
     chatId: request.user.telegramId,
-    text: `Заявка ${formatRequestCode(request.createdAt)} отменена.`
+    text: cancelLines.join("\n")
   });
 
   return request;
@@ -454,6 +467,7 @@ export async function rescheduleMeetingRequest(input: {
   actorRole: "USER" | "ADMIN";
   newStartAt: Date;
   newEndAt: Date;
+  comment?: string | null;
 }) {
   const request = await prisma.meetingRequest.findUnique({
     where: {
@@ -559,6 +573,7 @@ export async function rescheduleMeetingRequest(input: {
           old_end_at: request.endAt.toISOString(),
           new_start_at: input.newStartAt.toISOString(),
           new_end_at: input.newEndAt.toISOString(),
+          comment: input.comment ?? null,
           source: input.actorRole === JournalActorRole.ADMIN ? "webapp_admin" : "webapp_user",
           channel: "webapp"
         },
@@ -582,7 +597,8 @@ export async function rescheduleMeetingRequest(input: {
     text: [
       "Встреча перенесена.",
       `Номер заявки: ${formatRequestCode(request.createdAt)}`,
-      `Новое время: ${formatDateRangeMoscow(input.newStartAt, input.newEndAt)}`
+      `Новое время: ${formatDateRangeMoscow(input.newStartAt, input.newEndAt)}`,
+      ...(input.comment ? [`Комментарий: ${input.comment}`] : [])
     ].join("\n")
   });
 

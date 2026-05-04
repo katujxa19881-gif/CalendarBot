@@ -152,6 +152,24 @@ export function renderMiniAppHtml(): string {
       background: linear-gradient(135deg, rgba(0,229,255,.10), rgba(163,255,18,.08));
       margin-top: 10px;
     }
+    .guide {
+      margin-top: 10px;
+      border: 1px solid #1b344a;
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(8, 18, 30, .75);
+    }
+    .guide h3 {
+      margin: 0 0 6px;
+      font-size: 14px;
+      color: #a5ecff;
+    }
+    .guide p {
+      margin: 0 0 6px;
+      font-size: 13px;
+      color: #c8deef;
+      line-height: 1.35;
+    }
     .slot-date { color: #cce8ff; }
     .slot-time { color: #7af4ff; font-weight: 700; }
   </style>
@@ -303,6 +321,24 @@ export function renderMiniAppHtml(): string {
         canCancel: (status) => ['PENDING_APPROVAL', 'APPROVED', 'RESCHEDULE_REQUESTED', 'RESCHEDULED'].includes(status),
         canReschedule: (status) => ['APPROVED', 'RESCHEDULED'].includes(status)
       };
+      const adminReplyTemplates = {
+        approve: [
+          'Здравствуйте! Подтверждаю вашу заявку «{topic}». Встреча состоится {date}. Буду рада встрече!',
+          'Отлично, заявка «{topic}» подтверждена. Жду вас {date}. Если планы изменятся, напишите заранее.'
+        ],
+        reject: [
+          'Здравствуйте! К сожалению, по заявке «{topic}» на {date} сейчас подтвердить встречу не могу. Предлагаю выбрать другой слот.',
+          'Спасибо за заявку «{topic}». На {date} слот уже недоступен. Подберите, пожалуйста, другое время.'
+        ],
+        cancel: [
+          'Здравствуйте! Вынуждена отменить заявку «{topic}» на {date}. Давайте подберем новое удобное время.',
+          'По организационным причинам отменяю встречу «{topic}» ({date}). Напишите, и предложу новые варианты.'
+        ],
+        reschedule: [
+          'Здравствуйте! Встречу по заявке «{topic}» перенесла. Новое время: {date}.',
+          'Обновила время встречи по заявке «{topic}». Актуальный слот: {date}.'
+        ]
+      };
 
       function normalizeTopic(topic) {
         const t = (topic || '').trim();
@@ -350,6 +386,42 @@ export function renderMiniAppHtml(): string {
       function showActionError(error) {
         const message = error && error.message ? error.message : 'Неизвестная ошибка';
         alert('Операция не выполнена: ' + message);
+      }
+
+      function applyTemplateVars(template, request) {
+        return template
+          .replaceAll('{topic}', normalizeTopic(request.topic))
+          .replaceAll('{date}', formatDateRange(request.start_at, request.end_at));
+      }
+
+      function chooseAdminReply(action, request) {
+        const options = adminReplyTemplates[action] || [];
+        if (!options.length) {
+          return { cancelled: false, comment: null };
+        }
+
+        const menu = ['0 — Без шаблона'];
+        options.forEach((text, idx) => {
+          menu.push(String(idx + 1) + ' — ' + applyTemplateVars(text, request));
+        });
+        const selectedRaw = prompt('Выбери шаблон ответа:\\n' + menu.join('\\n'), '1');
+        if (selectedRaw === null) {
+          return { cancelled: true, comment: null };
+        }
+
+        const selected = Number(selectedRaw);
+        let initial = '';
+        if (Number.isFinite(selected) && selected > 0 && selected <= options.length) {
+          initial = applyTemplateVars(options[selected - 1], request);
+        }
+
+        const edited = prompt('Проверь и при необходимости отредактируй текст:', initial);
+        if (edited === null) {
+          return { cancelled: true, comment: null };
+        }
+
+        const trimmed = edited.trim();
+        return { cancelled: false, comment: trimmed ? trimmed : null };
       }
 
       function switchTab(tab) {
@@ -434,8 +506,13 @@ export function renderMiniAppHtml(): string {
               approve.textContent = 'Подтвердить';
               approve.className = 'lime';
               approve.onclick = async () => {
+                const reply = chooseAdminReply('approve', r);
+                if (reply.cancelled) return;
                 try {
-                  await api('/api/webapp/admin/requests/' + r.id + '/approve', { method: 'POST', body: '{}' });
+                  await api('/api/webapp/admin/requests/' + r.id + '/approve', {
+                    method: 'POST',
+                    body: JSON.stringify({ comment: reply.comment })
+                  });
                   await loadAdminRequests();
                 } catch (error) {
                   showActionError(error);
@@ -450,11 +527,12 @@ export function renderMiniAppHtml(): string {
               reject.textContent = 'Отклонить';
               reject.className = 'danger';
               reject.onclick = async () => {
-                const comment = prompt('Комментарий (опционально):', '') || null;
+                const reply = chooseAdminReply('reject', r);
+                if (reply.cancelled) return;
                 try {
                   await api('/api/webapp/admin/requests/' + r.id + '/reject', {
                     method: 'POST',
-                    body: JSON.stringify({ comment })
+                    body: JSON.stringify({ comment: reply.comment })
                   });
                   await loadAdminRequests();
                 } catch (error) {
@@ -469,8 +547,13 @@ export function renderMiniAppHtml(): string {
               const cancel = document.createElement('button');
               cancel.textContent = 'Отменить';
               cancel.onclick = async () => {
+                const reply = chooseAdminReply('cancel', r);
+                if (reply.cancelled) return;
                 try {
-                  await api('/api/webapp/admin/requests/' + r.id + '/cancel', { method: 'POST', body: '{}' });
+                  await api('/api/webapp/admin/requests/' + r.id + '/cancel', {
+                    method: 'POST',
+                    body: JSON.stringify({ comment: reply.comment })
+                  });
                   await loadAdminRequests();
                 } catch (error) {
                   showActionError(error);
@@ -487,10 +570,12 @@ export function renderMiniAppHtml(): string {
                 const start = prompt('Новый start_at ISO', r.start_at);
                 const end = prompt('Новый end_at ISO', r.end_at);
                 if (!start || !end) return;
+                const reply = chooseAdminReply('reschedule', r);
+                if (reply.cancelled) return;
                 try {
                   await api('/api/webapp/admin/requests/' + r.id + '/reschedule', {
                     method: 'POST',
-                    body: JSON.stringify({ start_at: start, end_at: end })
+                    body: JSON.stringify({ start_at: start, end_at: end, comment: reply.comment })
                   });
                   await loadAdminRequests();
                 } catch (error) {
@@ -571,7 +656,8 @@ export function renderMiniAppHtml(): string {
         els.profileBlock.innerHTML = [
           '<div><strong>' + (user.first_name || '-') + ' ' + (user.last_name || '') + '</strong></div>',
           '<div class="muted">@' + (user.username || '-') + ' / роль: ' + (role === 'admin' ? 'админ' : 'пользователь') + '</div>',
-          '<div class="hero"><strong>Запись на консультацию к Екатерине</strong><div class="small muted">Здесь можно быстро выбрать удобное время и записаться на консультацию по AI-вайбкодингу и финансовому планированию с ИИ. Создайте заявку, выберите слот и отслеживайте статус в одном месте.</div></div>'
+          '<div class="hero"><strong>Запись на консультацию к Екатерине</strong><div class="small muted">Здесь можно быстро выбрать удобное время и записаться на консультацию по AI-вайбкодингу и финансовому планированию с ИИ. Создайте заявку, выберите слот и отслеживайте статус в одном месте.</div></div>',
+          '<div class="guide"><h3>Гид по mini app</h3><p>1) Во вкладке «Новая заявка» выбери слот, заполни тему и отправь заявку.</p><p>2) Во вкладке «Мои заявки» отслеживай статусы и при необходимости отменяй или переноси встречу.</p><p>3) Во вкладке «Админ» заявки разложены по статусам: подтверждай, отклоняй, отменяй или переноси с шаблонным ответом.</p></div>'
         ].join('');
 
         if (role === 'admin') {
