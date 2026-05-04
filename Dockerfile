@@ -9,7 +9,7 @@ COPY package.json package-lock.json tsconfig.json ./
 COPY src ./src
 COPY prisma ./prisma
 RUN npm ci
-RUN npm run build
+RUN NODE_OPTIONS=--max-old-space-size=2048 npm run build
 
 FROM node:20-bookworm-slim
 WORKDIR /app
