@@ -687,7 +687,7 @@ function startMenuKeyboard(hasDraft: boolean): InlineKeyboard {
 
   keyboard.text("Мои заявки", ACTION.MENU_HISTORY);
   if (miniAppConfig.enabled && webAppUrl) {
-    keyboard.row().url("Mini App", webAppUrl);
+    keyboard.row().webApp("Mini App", webAppUrl);
   }
   return keyboard;
 }
@@ -2523,7 +2523,9 @@ export function createTelegramBotRuntime(
       return;
     }
 
-    await ctx.reply(`Открыть mini app: ${webAppUrl}`);
+    await ctx.reply("Открыть mini app:", {
+      reply_markup: new InlineKeyboard().webApp("Открыть NexaMeet", webAppUrl)
+    });
   });
 
   bot.callbackQuery(ACTION.CONSENT_ACCEPT, async (ctx) => {

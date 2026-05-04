@@ -507,7 +507,7 @@ function startMenuKeyboard(hasDraft) {
     }
     keyboard.text("Мои заявки", ACTION.MENU_HISTORY);
     if (miniAppConfig.enabled && webAppUrl) {
-        keyboard.row().url("Mini App", webAppUrl);
+        keyboard.row().webApp("Mini App", webAppUrl);
     }
     return keyboard;
 }
@@ -2085,7 +2085,9 @@ function createTelegramBotRuntime(options) {
             await ctx.reply("Mini app пока не включен.");
             return;
         }
-        await ctx.reply(`Открыть mini app: ${webAppUrl}`);
+        await ctx.reply("Открыть mini app:", {
+            reply_markup: new grammy_1.InlineKeyboard().webApp("Открыть NexaMeet", webAppUrl)
+        });
     });
     bot.callbackQuery(ACTION.CONSENT_ACCEPT, async (ctx) => {
         await safeAnswerCallbackQuery(ctx);

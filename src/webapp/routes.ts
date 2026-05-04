@@ -147,6 +147,13 @@ function replyAuthError(reply: FastifyReply, error: unknown): void {
 
 function replyOperationError(reply: FastifyReply, error: unknown): void {
   if (error instanceof WebAppOperationError) {
+    logEvent({
+      level: "error",
+      operation: "webapp_operation_failed",
+      status: "error",
+      error_code: error.code,
+      error_message: error.message
+    });
     const statusCode =
       error.code === "REQUEST_NOT_FOUND"
         ? 404
@@ -165,6 +172,13 @@ function replyOperationError(reply: FastifyReply, error: unknown): void {
   }
 
   if (error instanceof MeetingRequestStatusTransitionError) {
+    logEvent({
+      level: "error",
+      operation: "webapp_operation_failed",
+      status: "error",
+      error_code: error.code,
+      error_message: error.message
+    });
     reply.code(409).send({
       ok: false,
       error: error.code === "REQUEST_NOT_FOUND" ? "REQUEST_NOT_FOUND" : "REQUEST_STATUS_INVALID"
@@ -172,6 +186,13 @@ function replyOperationError(reply: FastifyReply, error: unknown): void {
     return;
   }
 
+  logEvent({
+    level: "error",
+    operation: "webapp_operation_failed",
+    status: "error",
+    error_code: "UNKNOWN_OPERATION_ERROR",
+    error_message: error instanceof Error ? error.message : "Unknown webapp operation error"
+  });
   reply.code(500).send({
     ok: false,
     error: "UNKNOWN_OPERATION_ERROR"
