@@ -288,6 +288,9 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
     }
 
     reply.header("content-type", "text/html; charset=utf-8");
+    reply.header("cache-control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    reply.header("pragma", "no-cache");
+    reply.header("expires", "0");
     reply.code(200).send(renderMiniAppHtml());
   });
 
