@@ -100,8 +100,16 @@ export function renderMiniAppHtml(): string {
       color: #9fd8ff;
       margin-right: 6px;
     }
-    .request { border: 1px solid #1b344a; border-radius: 12px; padding: 10px; margin: 8px 0; }
-    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+    .request { border: 1px solid #1b344a; border-radius: 12px; padding: 10px; margin: 8px 0; display: grid; gap: 8px; }
+    .request-head { min-height: 46px; display: grid; align-content: start; gap: 4px; }
+    .request-title { line-height: 1.3; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
+    .actions button { min-height: 44px; }
+    .actions button.ghost {
+      opacity: .38;
+      cursor: default;
+      pointer-events: none;
+    }
     .small { font-size: 12px; }
     .ok { color: var(--ok); }
     .err { color: #ff8f9a; }
@@ -542,9 +550,23 @@ export function renderMiniAppHtml(): string {
         return role === 'admin';
       }
 
+      const AUTO_CLEAN_DAYS = 21;
+      const AUTO_CLEAN_STATUSES = new Set(['REJECTED', 'CANCELLED', 'EXPIRED']);
+
+      function shouldAutoHideRequest(r, mode) {
+        if (mode !== 'admin' && mode !== 'my') return false;
+        if (!AUTO_CLEAN_STATUSES.has(String(r.status || ''))) return false;
+
+        const endAt = new Date(r.end_at);
+        if (Number.isNaN(endAt.getTime())) return false;
+        const threshold = Date.now() - AUTO_CLEAN_DAYS * 24 * 60 * 60 * 1000;
+        return endAt.getTime() < threshold;
+      }
+
       function renderRequests(container, requests, mode) {
         container.innerHTML = '';
-        if (!requests.length) {
+        const visibleRequests = (requests || []).filter((r) => !shouldAutoHideRequest(r, mode));
+        if (!visibleRequests.length) {
           container.innerHTML = '<div class="muted">Пусто</div>';
           return;
         }
@@ -565,7 +587,7 @@ export function renderMiniAppHtml(): string {
           node.className = 'request';
           const statusLabel = statusLabels[r.status] || r.status;
           node.innerHTML = [
-            '<div><span class="pill">' + statusLabel + '</span> <strong>' + normalizeTopic(r.topic) + '</strong></div>',
+            '<div class="request-head"><div class="request-title"><span class="pill">' + statusLabel + '</span> <strong>' + normalizeTopic(r.topic) + '</strong></div></div>',
             '<div class="small muted">' + formatDateRange(r.start_at, r.end_at) + '</div>',
             '<div class="actions"></div>'
           ].join('');
@@ -610,101 +632,95 @@ export function renderMiniAppHtml(): string {
           }
 
           if (mode === 'admin') {
-            if (adminActionRules.canApprove(r.status)) {
-              const approve = document.createElement('button');
-              approve.textContent = 'Подтвердить';
-              approve.className = 'lime';
-              approve.onclick = async () => {
-                const reply = await chooseAdminReply('approve', r);
-                if (reply.cancelled) return;
-                try {
+            const adminButtons = [
+              {
+                text: 'Подтвердить',
+                className: 'lime',
+                enabled: adminActionRules.canApprove(r.status),
+                run: async () => {
+                  const reply = await chooseAdminReply('approve', r);
+                  if (reply.cancelled) return;
                   await api('/api/webapp/admin/requests/' + r.id + '/approve', {
                     method: 'POST',
                     body: JSON.stringify({ comment: reply.comment })
                   });
-                  await loadAdminRequests();
-                } catch (error) {
-                  showActionError(error);
-                  await loadAdminRequests();
                 }
-              };
-              actions.appendChild(approve);
-            }
-
-            if (adminActionRules.canReject(r.status)) {
-              const reject = document.createElement('button');
-              reject.textContent = 'Отклонить';
-              reject.className = 'danger';
-              reject.onclick = async () => {
-                const reply = await chooseAdminReply('reject', r);
-                if (reply.cancelled) return;
-                try {
+              },
+              {
+                text: 'Отклонить',
+                className: 'danger',
+                enabled: adminActionRules.canReject(r.status),
+                run: async () => {
+                  const reply = await chooseAdminReply('reject', r);
+                  if (reply.cancelled) return;
                   await api('/api/webapp/admin/requests/' + r.id + '/reject', {
                     method: 'POST',
                     body: JSON.stringify({ comment: reply.comment })
                   });
-                  await loadAdminRequests();
-                } catch (error) {
-                  showActionError(error);
-                  await loadAdminRequests();
                 }
-              };
-              actions.appendChild(reject);
-            }
-
-            if (adminActionRules.canCancel(r.status)) {
-              const cancel = document.createElement('button');
-              cancel.textContent = 'Отменить';
-              cancel.onclick = async () => {
-                const reply = await chooseAdminReply('cancel', r);
-                if (reply.cancelled) return;
-                try {
+              },
+              {
+                text: 'Отменить',
+                className: '',
+                enabled: adminActionRules.canCancel(r.status),
+                run: async () => {
+                  const reply = await chooseAdminReply('cancel', r);
+                  if (reply.cancelled) return;
                   await api('/api/webapp/admin/requests/' + r.id + '/cancel', {
                     method: 'POST',
                     body: JSON.stringify({ comment: reply.comment })
                   });
-                  await loadAdminRequests();
-                } catch (error) {
-                  showActionError(error);
-                  await loadAdminRequests();
                 }
-              };
-              actions.appendChild(cancel);
-            }
-
-            if (adminActionRules.canReschedule(r.status)) {
-              const reschedule = document.createElement('button');
-              reschedule.textContent = 'Перенести';
-              reschedule.onclick = async () => {
-                const start = prompt('Новый start_at ISO', r.start_at);
-                const end = prompt('Новый end_at ISO', r.end_at);
-                if (!start || !end) return;
-                const reply = await chooseAdminReply('reschedule', r);
-                if (reply.cancelled) return;
-                try {
+              },
+              {
+                text: 'Перенести',
+                className: '',
+                enabled: adminActionRules.canReschedule(r.status),
+                run: async () => {
+                  const start = prompt('Новый start_at ISO', r.start_at);
+                  const end = prompt('Новый end_at ISO', r.end_at);
+                  if (!start || !end) return;
+                  const reply = await chooseAdminReply('reschedule', r);
+                  if (reply.cancelled) return;
                   await api('/api/webapp/admin/requests/' + r.id + '/reschedule', {
                     method: 'POST',
                     body: JSON.stringify({ start_at: start, end_at: end, comment: reply.comment })
                   });
+                }
+              }
+            ];
+
+            adminButtons.forEach((cfg) => {
+              const btn = document.createElement('button');
+              btn.textContent = cfg.text;
+              btn.className = (cfg.className + (cfg.enabled ? '' : ' ghost')).trim();
+              btn.disabled = !cfg.enabled;
+              if (!cfg.enabled) {
+                actions.appendChild(btn);
+                return;
+              }
+              btn.onclick = async () => {
+                try {
+                  await cfg.run();
                   await loadAdminRequests();
                 } catch (error) {
                   showActionError(error);
                   await loadAdminRequests();
                 }
               };
-              actions.appendChild(reschedule);
-            }
+              actions.appendChild(btn);
+            });
           }
           return node;
         };
 
         if (mode !== 'admin' && mode !== 'my') {
-          requests.forEach((r) => container.appendChild(renderCard(r)));
+          visibleRequests.forEach((r) => container.appendChild(renderCard(r)));
           return;
         }
 
         groups.forEach((group, index) => {
-          const subset = requests.filter((r) => r.status === group.key);
+          const subset = visibleRequests.filter((r) => r.status === group.key);
           if (!subset.length) return;
           const details = document.createElement('details');
           details.className = 'group';
