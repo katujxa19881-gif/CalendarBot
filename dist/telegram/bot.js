@@ -27,6 +27,7 @@ const EMAIL_SCHEMA = zod_1.z.string().email();
 const ACTION = {
     MENU_NEW: "menu:new",
     MENU_HISTORY: "menu:history",
+    MENU_ADMIN_ALL: "menu:admin:all",
     MENU_RESUME: "menu:resume",
     MENU_RESTART: "menu:restart",
     CONSENT_ACCEPT: "consent:accept",
@@ -648,6 +649,9 @@ function startMenuKeyboard(hasDraft) {
     keyboard.text("Мои заявки (4)", ACTION.MENU_HISTORY);
     return keyboard;
 }
+function myRequestsShortcutKeyboard() {
+    return new grammy_1.InlineKeyboard().text("Мои заявки", ACTION.MENU_HISTORY);
+}
 function navKeyboard(includeBack) {
     const keyboard = new grammy_1.InlineKeyboard();
     if (includeBack) {
@@ -787,6 +791,8 @@ function adminSettingsKeyboard() {
         .text("Опережение -1ч", "admin:settings:set:slot_min_lead_hours:-1")
         .text("Опережение +1ч", "admin:settings:set:slot_min_lead_hours:1")
         .row()
+        .text("Все заявки", ACTION.MENU_ADMIN_ALL)
+        .row()
         .text("Обновить", "admin:settings:open:refresh:0");
 }
 function formatAdminSettingsMessage(settings) {
@@ -888,6 +894,27 @@ async function showHistory(ctx, user) {
         lines.push(`Дата и время: ${formatDateRangeMoscow(request.startAt, request.endAt)}`);
         const keyboard = requestActionsKeyboard(request);
         await ctx.reply(lines.join("\n"), keyboard ? { reply_markup: keyboard } : undefined);
+    }
+}
+async function showAllRequestsForAdmin(ctx, limit = 10) {
+    const requests = await db_1.prisma.meetingRequest.findMany({
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        include: { user: true }
+    });
+    if (requests.length === 0) {
+        await ctx.reply("Пока нет заявок.");
+        return;
+    }
+    await ctx.reply(`Последние заявки (все пользователи, ${requests.length}):`);
+    for (const request of requests) {
+        const lines = [];
+        lines.push(`Номер заявки: ${formatRequestCode(request)}`);
+        lines.push(`Пользователь: @${request.user.username ?? "-"} (${request.user.telegramId})`);
+        lines.push(`Тема: ${request.topic}`);
+        lines.push(`Статус: ${formatHistoryStatus(request.status)}`);
+        lines.push(`Дата и время: ${formatDateRangeMoscow(request.startAt, request.endAt)}`);
+        await ctx.reply(lines.join("\n"));
     }
 }
 async function showConsent(ctx) {
@@ -1223,7 +1250,9 @@ async function notifyUserAboutApprovalResult(input) {
         lines.push("Если планы изменятся, откройте «Мои заявки» и выберите действие.");
     }
     try {
-        await input.ctx.api.sendMessage(chatId, lines.join("\n"));
+        await input.ctx.api.sendMessage(chatId, lines.join("\n"), {
+            reply_markup: myRequestsShortcutKeyboard()
+        });
         (0, logger_1.logEvent)({
             operation: "user_notified",
             status: "ok",
@@ -1650,7 +1679,9 @@ async function cancelMeetingRequestByUser(ctx, user, meetingRequestId) {
             entity_id: request.id
         });
         pendingRescheduleByUser.delete(user.telegramId);
-        await ctx.reply(`Заявка ${formatRequestCode(request)} отменена.`);
+        await ctx.reply(`Заявка ${formatRequestCode(request)} отменена.`, {
+            reply_markup: myRequestsShortcutKeyboard()
+        });
     }
     catch (error) {
         (0, logger_1.logEvent)({
@@ -1869,7 +1900,9 @@ async function completeRescheduleByUser(ctx, user, meetingRequestId, slotIndex) 
             }
         });
         pendingRescheduleByUser.delete(user.telegramId);
-        await ctx.reply(`Встреча перенесена.\nНомер заявки: ${formatRequestCode(request)}\nНовое время: ${formatDateRangeMoscow(selectedSlot.startAt, selectedSlot.endAt)}`);
+        await ctx.reply(`Встреча перенесена.\nНомер заявки: ${formatRequestCode(request)}\nНовое время: ${formatDateRangeMoscow(selectedSlot.startAt, selectedSlot.endAt)}`, {
+            reply_markup: myRequestsShortcutKeyboard()
+        });
     }
     catch (error) {
         (0, logger_1.logEvent)({
@@ -2158,6 +2191,17 @@ function createTelegramBotRuntime(options) {
         }
         await showAdminSettingsPanel(ctx);
     });
+    bot.command("all", async (ctx) => {
+        const user = ctx.state.appUser;
+        if (!user) {
+            return;
+        }
+        if (!isAdminActor(ctx)) {
+            await ctx.reply("Команда доступна только администратору.");
+            return;
+        }
+        await showAllRequestsForAdmin(ctx);
+    });
     bot.command("version", async (ctx) => {
         await ctx.reply(`Версия: ${BOT_BUILD_LABEL}\nPID: ${process.pid}`);
     });
@@ -2196,6 +2240,18 @@ function createTelegramBotRuntime(options) {
             return;
         }
         await showHistory(ctx, user);
+    });
+    bot.callbackQuery(ACTION.MENU_ADMIN_ALL, async (ctx) => {
+        await safeAnswerCallbackQuery(ctx);
+        const user = ctx.state.appUser;
+        if (!user) {
+            return;
+        }
+        if (!isAdminActor(ctx)) {
+            await ctx.reply("Доступно только администратору.");
+            return;
+        }
+        await showAllRequestsForAdmin(ctx);
     });
     bot.callbackQuery(ACTION.MENU_RESUME, async (ctx) => {
         await safeAnswerCallbackQuery(ctx);
