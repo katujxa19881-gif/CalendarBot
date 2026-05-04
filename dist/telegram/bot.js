@@ -646,7 +646,7 @@ function startMenuKeyboard(hasDraft) {
     else {
         keyboard.text("Новая заявка", ACTION.MENU_NEW).row();
     }
-    keyboard.text("Мои заявки (4)", ACTION.MENU_HISTORY);
+    keyboard.text("Мои заявки", ACTION.MENU_HISTORY);
     return keyboard;
 }
 function myRequestsShortcutKeyboard() {
@@ -883,7 +883,7 @@ async function showHistory(ctx, user) {
             requests_count: requests.length
         }
     });
-    await ctx.reply("Последние заявки:", {
+    await ctx.reply(`Последние заявки (${requests.length} из 4):`, {
         reply_markup: startMenuKeyboard(Boolean(await getActiveDraft(user.id)))
     });
     for (const request of requests) {

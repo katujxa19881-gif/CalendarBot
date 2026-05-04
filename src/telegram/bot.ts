@@ -891,7 +891,7 @@ function startMenuKeyboard(hasDraft: boolean): InlineKeyboard {
     keyboard.text("Новая заявка", ACTION.MENU_NEW).row();
   }
 
-  keyboard.text("Мои заявки (4)", ACTION.MENU_HISTORY);
+  keyboard.text("Мои заявки", ACTION.MENU_HISTORY);
   return keyboard;
 }
 
@@ -1171,7 +1171,7 @@ async function showHistory(ctx: AppContext, user: User): Promise<void> {
     }
   });
 
-  await ctx.reply("Последние заявки:", {
+  await ctx.reply(`Последние заявки (${requests.length} из 4):`, {
     reply_markup: startMenuKeyboard(Boolean(await getActiveDraft(user.id)))
   });
 
