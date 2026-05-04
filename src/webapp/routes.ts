@@ -237,29 +237,12 @@ async function requireAdminSession(
   return session;
 }
 
-function hasValidAdminPin(request: FastifyRequest): boolean {
-  const { adminPin } = getMiniAppConfig();
-  if (!adminPin) {
-    return true;
-  }
-  const headerPin = String(request.headers["x-admin-pin"] ?? "").trim();
-  return headerPin.length > 0 && headerPin === adminPin;
-}
-
 async function requireAdminAccess(
   request: FastifyRequest,
   reply: FastifyReply
 ): Promise<SessionContext | null> {
   const session = await requireAdminSession(request, reply);
   if (!session) {
-    return null;
-  }
-
-  if (!hasValidAdminPin(request)) {
-    reply.code(403).send({
-      ok: false,
-      error: "ADMIN_PIN_INVALID"
-    });
     return null;
   }
 

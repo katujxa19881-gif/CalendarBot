@@ -384,8 +384,6 @@ export function renderMiniAppHtml(): string {
       let slotsCache = [];
       let selectedSlotIndex = null;
       let replyModalResolver = null;
-      let adminPin = null;
-      let adminUnlocked = false;
 
       const statusLabels = {
         NEW: 'Новая',
@@ -458,9 +456,6 @@ export function renderMiniAppHtml(): string {
           headers['Content-Type'] = 'application/json';
         }
         if (token) headers['Authorization'] = 'Bearer ' + token;
-        if (adminPin && url.includes('/api/webapp/admin/')) {
-          headers['x-admin-pin'] = adminPin;
-        }
         const response = await fetch(url, Object.assign({}, options, { headers }));
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data.ok === false) {
@@ -544,29 +539,7 @@ export function renderMiniAppHtml(): string {
       }
 
       async function ensureAdminUnlocked() {
-        if (role !== 'admin') return false;
-        if (adminUnlocked) return true;
-
-        const enteredPin = prompt('Введите PIN-код для доступа к админ-панели:', '');
-        if (enteredPin === null) return false;
-        const pin = enteredPin.trim();
-        if (!pin) {
-          alert('PIN не введен');
-          return false;
-        }
-
-        try {
-          await api('/api/webapp/admin/pin/verify', {
-            method: 'POST',
-            body: JSON.stringify({ pin })
-          });
-          adminPin = pin;
-          adminUnlocked = true;
-          return true;
-        } catch (error) {
-          showActionError(error);
-          return false;
-        }
+        return role === 'admin';
       }
 
       function renderRequests(container, requests, mode) {
