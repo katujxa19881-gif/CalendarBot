@@ -292,6 +292,28 @@ export function renderMiniAppHtml(): string {
         </div>
         <hr style="border-color:#173049; opacity:.5; margin:12px 0" />
         <h2>Заявки</h2>
+        <div class="grid2">
+          <label>Статус
+            <select id="aStatus">
+              <option value="">Все</option>
+              <option value="PENDING_APPROVAL">На согласовании</option>
+              <option value="APPROVED">Подтвержденные</option>
+              <option value="RESCHEDULED">Перенесенные</option>
+              <option value="REJECTED">Отклоненные</option>
+              <option value="CANCELLED">Отмененные</option>
+              <option value="EXPIRED">Истекшие</option>
+            </select>
+          </label>
+          <label>С даты
+            <input id="aFrom" type="date" />
+          </label>
+          <label>По дату
+            <input id="aTo" type="date" />
+          </label>
+          <label>Лимит
+            <input id="aLimit" type="number" min="1" max="100" value="30" />
+          </label>
+        </div>
         <button id="btnReloadAdmin">Обновить</button>
         <div id="adminRequests" class="row"></div>
       </section>
@@ -342,7 +364,11 @@ export function renderMiniAppHtml(): string {
         sBuffer: document.getElementById('sBuffer'),
         sLimit: document.getElementById('sLimit'),
         sHorizon: document.getElementById('sHorizon'),
-        sLead: document.getElementById('sLead')
+        sLead: document.getElementById('sLead'),
+        aStatus: document.getElementById('aStatus'),
+        aFrom: document.getElementById('aFrom'),
+        aTo: document.getElementById('aTo'),
+        aLimit: document.getElementById('aLimit')
       };
       const modalEls = {
         backdrop: document.getElementById('replyModalBackdrop'),
@@ -714,7 +740,19 @@ export function renderMiniAppHtml(): string {
 
       async function loadAdminRequests() {
         if (role !== 'admin') return;
-        const data = await api('/api/webapp/admin/requests?limit=30');
+        const params = new URLSearchParams();
+        const status = (els.aStatus.value || '').trim();
+        const from = (els.aFrom.value || '').trim();
+        const to = (els.aTo.value || '').trim();
+        const limitRaw = Number(els.aLimit.value || 30);
+        const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(100, Math.floor(limitRaw))) : 30;
+
+        params.set('limit', String(limit));
+        if (status) params.set('status', status);
+        if (from) params.set('from', new Date(from + 'T00:00:00.000Z').toISOString());
+        if (to) params.set('to', new Date(to + 'T23:59:59.999Z').toISOString());
+
+        const data = await api('/api/webapp/admin/requests?' + params.toString());
         renderRequests(els.adminRequests, data.requests || [], 'admin');
       }
 
