@@ -1,0 +1,20 @@
+services:
+  calendarbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: calendarbot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      SQLITE_PATH: /app/data/app.db
+      DATABASE_URL: file:/app/data/app.db
+      TELEGRAM_TRANSPORT: polling
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "3000:3000"
