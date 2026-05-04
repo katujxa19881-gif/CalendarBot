@@ -30,6 +30,7 @@ export class WebAppOperationError extends Error {
     | "REQUEST_NOT_FOUND"
     | "REQUEST_STATUS_INVALID"
     | "CALENDAR_PROVIDER_MISSING"
+    | "CALENDAR_SYNC_FAILED"
     | "CALENDAR_EVENT_MISSING"
     | "SLOT_NOT_AVAILABLE"
     | "SETTINGS_PATCH_INVALID";
@@ -39,6 +40,7 @@ export class WebAppOperationError extends Error {
       | "REQUEST_NOT_FOUND"
       | "REQUEST_STATUS_INVALID"
       | "CALENDAR_PROVIDER_MISSING"
+      | "CALENDAR_SYNC_FAILED"
       | "CALENDAR_EVENT_MISSING"
       | "SLOT_NOT_AVAILABLE"
       | "SETTINGS_PATCH_INVALID",
@@ -180,18 +182,25 @@ async function createCalendarEvent(input: {
     throw new WebAppOperationError("CALENDAR_PROVIDER_MISSING", "Calendar provider is not configured");
   }
 
-  return calendarSyncProvider.createEvent({
-    externalRequestId: input.requestId,
-    topic: input.topic,
-    description: input.description,
-    format: input.format,
-    location: input.location,
-    startAt: input.startAt,
-    endAt: input.endAt,
-    attendeeEmail: input.email,
-    attendeeFirstName: input.firstName,
-    attendeeLastName: input.lastName
-  });
+  try {
+    return await calendarSyncProvider.createEvent({
+      externalRequestId: input.requestId,
+      topic: input.topic,
+      description: input.description,
+      format: input.format,
+      location: input.location,
+      startAt: input.startAt,
+      endAt: input.endAt,
+      attendeeEmail: input.email,
+      attendeeFirstName: input.firstName,
+      attendeeLastName: input.lastName
+    });
+  } catch (error) {
+    throw new WebAppOperationError(
+      "CALENDAR_SYNC_FAILED",
+      error instanceof Error ? error.message : "Calendar sync failed"
+    );
+  }
 }
 
 export async function approveMeetingRequestByAdmin(input: {

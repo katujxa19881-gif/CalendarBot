@@ -676,6 +676,8 @@ function getPreviousStep(currentStep: WizardStep, payload: DraftPayload): Wizard
 
 function startMenuKeyboard(hasDraft: boolean): InlineKeyboard {
   const keyboard = new InlineKeyboard();
+  const miniAppConfig = getMiniAppConfig();
+  const webAppUrl = miniAppConfig.webAppUrl?.trim();
 
   if (hasDraft) {
     keyboard.text("Продолжить", ACTION.MENU_RESUME).text("Начать заново", ACTION.MENU_RESTART).row();
@@ -684,6 +686,9 @@ function startMenuKeyboard(hasDraft: boolean): InlineKeyboard {
   }
 
   keyboard.text("Мои заявки", ACTION.MENU_HISTORY);
+  if (miniAppConfig.enabled && webAppUrl) {
+    keyboard.row().url("Mini App", webAppUrl);
+  }
   return keyboard;
 }
 

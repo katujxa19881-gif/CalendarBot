@@ -497,6 +497,8 @@ function getPreviousStep(currentStep, payload) {
 }
 function startMenuKeyboard(hasDraft) {
     const keyboard = new grammy_1.InlineKeyboard();
+    const miniAppConfig = (0, env_1.getMiniAppConfig)();
+    const webAppUrl = miniAppConfig.webAppUrl?.trim();
     if (hasDraft) {
         keyboard.text("Продолжить", ACTION.MENU_RESUME).text("Начать заново", ACTION.MENU_RESTART).row();
     }
@@ -504,6 +506,9 @@ function startMenuKeyboard(hasDraft) {
         keyboard.text("Новая заявка", ACTION.MENU_NEW).row();
     }
     keyboard.text("Мои заявки", ACTION.MENU_HISTORY);
+    if (miniAppConfig.enabled && webAppUrl) {
+        keyboard.row().url("Mini App", webAppUrl);
+    }
     return keyboard;
 }
 function myRequestsShortcutKeyboard() {

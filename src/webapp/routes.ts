@@ -150,9 +150,11 @@ function replyOperationError(reply: FastifyReply, error: unknown): void {
     const statusCode =
       error.code === "REQUEST_NOT_FOUND"
         ? 404
-        : error.code === "REQUEST_STATUS_INVALID" || error.code === "SLOT_NOT_AVAILABLE"
+        : error.code === "REQUEST_STATUS_INVALID" ||
+            error.code === "SLOT_NOT_AVAILABLE" ||
+            error.code === "CALENDAR_SYNC_FAILED"
           ? 409
-          : error.code === "SETTINGS_PATCH_INVALID"
+        : error.code === "SETTINGS_PATCH_INVALID"
             ? 400
             : 500;
     reply.code(statusCode).send({

@@ -489,6 +489,15 @@ export function renderMiniAppHtml(): string {
           reschedule: 'Ответ при переносе'
         };
 
+        if (!modalEls.backdrop || !modalEls.templateList || !modalEls.title || !modalEls.text) {
+          const fallbackText = prompt((actionTitles[action] || 'Комментарий') + '\\n(Можно оставить пустым)', '');
+          if (fallbackText === null) {
+            return Promise.resolve({ cancelled: true, comment: null });
+          }
+          const trimmed = fallbackText.trim();
+          return Promise.resolve({ cancelled: false, comment: trimmed ? trimmed : null });
+        }
+
         return new Promise((resolve) => {
           replyModalResolver = resolve;
           modalEls.title.textContent = actionTitles[action] || 'Шаблон ответа';
