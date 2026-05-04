@@ -95,3 +95,40 @@ export function getBackgroundJobsConfig(): {
     batchSize: Number.isFinite(batchSize) && batchSize > 0 ? Math.floor(batchSize) : 10
   };
 }
+
+export function getMiniAppConfig(): {
+  enabled: boolean;
+  adminEnabled: boolean;
+  onboardingEnabled: boolean;
+  authMaxAgeSeconds: number;
+  sessionTtlSeconds: number;
+  sessionSecret: string | null;
+  webAppUrl: string | null;
+  menuButtonText: string;
+} {
+  const enabledRaw = (process.env.MINI_APP_ENABLED ?? "false").trim().toLowerCase();
+  const adminEnabledRaw = (process.env.MINI_APP_ADMIN_ENABLED ?? "false").trim().toLowerCase();
+  const onboardingEnabledRaw = (process.env.MINI_APP_ONBOARDING_ENABLED ?? "true").trim().toLowerCase();
+  const authMaxAgeSeconds = Number(process.env.MINI_APP_AUTH_MAX_AGE_SECONDS ?? 86400);
+  const sessionTtlSeconds = Number(process.env.MINI_APP_SESSION_TTL_SECONDS ?? 43200);
+  const sessionSecret = process.env.MINI_APP_SESSION_SECRET ?? process.env.TELEGRAM_BOT_TOKEN ?? null;
+  const webAppUrl = process.env.MINI_APP_URL ?? null;
+  const menuButtonText = process.env.MINI_APP_MENU_BUTTON_TEXT ?? "Открыть Calendar";
+
+  return {
+    enabled: enabledRaw === "1" || enabledRaw === "true" || enabledRaw === "yes",
+    adminEnabled: adminEnabledRaw === "1" || adminEnabledRaw === "true" || adminEnabledRaw === "yes",
+    onboardingEnabled: onboardingEnabledRaw !== "0" && onboardingEnabledRaw !== "false" && onboardingEnabledRaw !== "no",
+    authMaxAgeSeconds:
+      Number.isFinite(authMaxAgeSeconds) && authMaxAgeSeconds > 0
+        ? Math.floor(authMaxAgeSeconds)
+        : 86400,
+    sessionTtlSeconds:
+      Number.isFinite(sessionTtlSeconds) && sessionTtlSeconds > 0
+        ? Math.floor(sessionTtlSeconds)
+        : 43200,
+    sessionSecret,
+    webAppUrl,
+    menuButtonText
+  };
+}

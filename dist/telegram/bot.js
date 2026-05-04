@@ -7,6 +7,7 @@ const client_1 = require("@prisma/client");
 const grammy_1 = require("grammy");
 const zod_1 = require("zod");
 const db_1 = require("../db");
+const slots_1 = require("../application/slots");
 const jobs_1 = require("../background/jobs");
 const app_settings_1 = require("../domain/app-settings");
 const meeting_request_status_1 = require("../domain/meeting-request-status");
@@ -952,7 +953,9 @@ async function showStepPrompt(ctx, step, payload) {
         }
         let slots;
         try {
-            slots = await buildAvailableSlots(payload.durationMinutes);
+            slots = await (0, slots_1.buildAvailableSlots)({
+                durationMinutes: payload.durationMinutes
+            });
         }
         catch {
             await ctx.reply("Календарь сейчас недоступен. Попробуйте выбрать время немного позже.", {
@@ -1090,7 +1093,10 @@ async function submitMeetingRequest(ctx, user, draft, payload) {
         return;
     }
     try {
-        const slotStillAvailable = await ensureSlotStillAvailable(slotStartAt, slotEndAt);
+        const slotStillAvailable = await (0, slots_1.ensureSlotStillAvailable)({
+            startAt: slotStartAt,
+            endAt: slotEndAt
+        });
         if (!slotStillAvailable) {
             (0, logger_1.logEvent)({
                 level: "warn",
@@ -1721,7 +1727,10 @@ async function requestRescheduleByUser(ctx, user, meetingRequestId) {
         await ctx.reply("Перенос доступен только для подтвержденной встречи.");
         return;
     }
-    const slots = await buildAvailableSlots(request.durationMinutes, request.id);
+    const slots = await (0, slots_1.buildAvailableSlots)({
+        durationMinutes: request.durationMinutes,
+        excludeMeetingRequestId: request.id
+    });
     if (slots.length === 0) {
         await ctx.reply("Свободные слоты для переноса не найдены в ближайшие 30 дней.");
         return;
@@ -1793,13 +1802,20 @@ async function completeRescheduleByUser(ctx, user, meetingRequestId, slotIndex) 
         return;
     }
     try {
-        const slots = await buildAvailableSlots(request.durationMinutes, request.id);
+        const slots = await (0, slots_1.buildAvailableSlots)({
+            durationMinutes: request.durationMinutes,
+            excludeMeetingRequestId: request.id
+        });
         const selectedSlot = slots[slotIndex];
         if (!selectedSlot) {
             await ctx.reply("Выбранный слот недоступен. Нажмите «Перенести» и выберите заново.");
             return;
         }
-        const slotStillAvailable = await ensureSlotStillAvailable(selectedSlot.startAt, selectedSlot.endAt, request.id);
+        const slotStillAvailable = await (0, slots_1.ensureSlotStillAvailable)({
+            startAt: selectedSlot.startAt,
+            endAt: selectedSlot.endAt,
+            excludeMeetingRequestId: request.id
+        });
         if (!slotStillAvailable) {
             await ctx.reply("Этот слот уже занят. Нажмите «Перенести» и выберите другой.");
             return;
@@ -2205,6 +2221,15 @@ function createTelegramBotRuntime(options) {
     bot.command("version", async (ctx) => {
         await ctx.reply(`Версия: ${BOT_BUILD_LABEL}\nPID: ${process.pid}`);
     });
+    bot.command("app", async (ctx) => {
+        const miniAppConfig = (0, env_1.getMiniAppConfig)();
+        const webAppUrl = miniAppConfig.webAppUrl?.trim();
+        if (!miniAppConfig.enabled || !webAppUrl) {
+            await ctx.reply("Mini app пока не включен.");
+            return;
+        }
+        await ctx.reply(`Открыть mini app: ${webAppUrl}`);
+    });
     bot.callbackQuery(ACTION.CONSENT_ACCEPT, async (ctx) => {
         await safeAnswerCallbackQuery(ctx);
         const user = ctx.state.appUser;
@@ -2346,7 +2371,9 @@ function createTelegramBotRuntime(options) {
         }
         let slots;
         try {
-            slots = await buildAvailableSlots(payload.durationMinutes);
+            slots = await (0, slots_1.buildAvailableSlots)({
+                durationMinutes: payload.durationMinutes
+            });
         }
         catch {
             await ctx.reply("Не удалось получить доступные слоты из календаря. Попробуйте позже.");

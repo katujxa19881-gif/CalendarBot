@@ -3,6 +3,7 @@ import Fastify, { FastifyReply, FastifyRequest } from "fastify";
 import { runHealthcheckProbe } from "./db";
 import { getTelegramRuntime } from "./telegram/bot";
 import { logEvent } from "./logger";
+import { registerMiniAppRoutes } from "./webapp/routes";
 
 export function buildServer() {
   const app = Fastify({ logger: false });
@@ -59,6 +60,8 @@ export function buildServer() {
 
     await runtime.webhookHandler(_request, reply);
   });
+
+  void registerMiniAppRoutes(app);
 
   return app;
 }

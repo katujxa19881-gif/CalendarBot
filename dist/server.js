@@ -9,6 +9,7 @@ const fastify_1 = __importDefault(require("fastify"));
 const db_1 = require("./db");
 const bot_1 = require("./telegram/bot");
 const logger_1 = require("./logger");
+const routes_1 = require("./webapp/routes");
 function buildServer() {
     const app = (0, fastify_1.default)({ logger: false });
     app.addHook("onRequest", async (request) => {
@@ -54,5 +55,6 @@ function buildServer() {
         }
         await runtime.webhookHandler(_request, reply);
     });
+    void (0, routes_1.registerMiniAppRoutes)(app);
     return app;
 }
