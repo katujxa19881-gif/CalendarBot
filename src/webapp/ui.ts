@@ -11,7 +11,7 @@ function escapeHtml(value: string): string {
 
 export function renderMiniAppHtml(): string {
   const config = getMiniAppConfig();
-  const appTitle = "CalendarBot Mini App";
+  const appTitle = "Запись в календарь";
   const onboardingEnabled = config.onboardingEnabled ? "true" : "false";
 
   return `<!doctype html>
@@ -105,6 +105,32 @@ export function renderMiniAppHtml(): string {
     .small { font-size: 12px; }
     .ok { color: var(--ok); }
     .err { color: #ff8f9a; }
+    .slot-list {
+      max-height: 240px;
+      overflow: auto;
+      border: 1px solid #1b344a;
+      border-radius: 12px;
+      padding: 6px;
+      background: rgba(5, 12, 20, .7);
+    }
+    .slot-item {
+      width: 100%;
+      text-align: left;
+      border-radius: 10px;
+      border: 1px solid #1f3f5c;
+      background: #0a1626;
+      margin: 5px 0;
+      padding: 10px 10px;
+      font-size: 13px;
+      line-height: 1.3;
+    }
+    .slot-item.active {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 1px rgba(0,229,255,.25) inset;
+      background: #10253b;
+    }
+    .slot-date { color: #cce8ff; }
+    .slot-time { color: #7af4ff; font-weight: 700; }
   </style>
 </head>
 <body>
@@ -128,7 +154,7 @@ export function renderMiniAppHtml(): string {
         <button data-tab="home" class="active">Главная</button>
         <button data-tab="new">Новая заявка</button>
         <button data-tab="my">Мои заявки</button>
-        <button id="tabAdmin" data-tab="admin" class="hidden">Admin</button>
+        <button id="tabAdmin" data-tab="admin" class="hidden">Админ</button>
       </div>
 
       <section id="tab-home" class="card">
@@ -157,7 +183,7 @@ export function renderMiniAppHtml(): string {
         </div>
         <div class="row">
           <button id="btnLoadSlots">Показать доступные слоты</button>
-          <select id="fSlot"></select>
+          <div id="fSlot" class="slot-list muted">Слоты пока не загружены.</div>
         </div>
         <div class="grid2">
           <label>Имя <input id="fFirstName" /></label>
@@ -179,11 +205,11 @@ export function renderMiniAppHtml(): string {
       </section>
 
       <section id="tab-admin" class="card hidden">
-        <h2>Admin — заявки</h2>
+        <h2>Админ — заявки</h2>
         <button id="btnReloadAdmin">Обновить</button>
         <div id="adminRequests" class="row"></div>
         <hr style="border-color:#173049; opacity:.5; margin:12px 0" />
-        <h2>Admin — настройки</h2>
+        <h2>Админ — настройки</h2>
         <div class="grid2">
           <label>Начало дня <input id="sStart" type="number" /></label>
           <label>Конец дня <input id="sEnd" type="number" /></label>
@@ -235,6 +261,32 @@ export function renderMiniAppHtml(): string {
       let token = null;
       let role = 'user';
       let slotsCache = [];
+      let selectedSlotIndex = null;
+
+      const statusLabels = {
+        NEW: 'Новая',
+        PENDING_APPROVAL: 'На согласовании',
+        APPROVED: 'Подтверждена',
+        REJECTED: 'Отклонена',
+        CANCELLED: 'Отменена',
+        RESCHEDULE_REQUESTED: 'Перенос запрошен',
+        RESCHEDULED: 'Перенесена',
+        EXPIRED: 'Истекла'
+      };
+
+      function formatDateParts(iso) {
+        const d = new Date(iso);
+        return {
+          date: new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', weekday: 'short', day: '2-digit', month: '2-digit' }).format(d),
+          time: new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit' }).format(d)
+        };
+      }
+
+      function formatDateRange(startIso, endIso) {
+        const s = formatDateParts(startIso);
+        const e = formatDateParts(endIso);
+        return s.date + ' • ' + s.time + '–' + e.time + ' (МСК)';
+      }
 
       function setStatus(text, type = 'muted') {
         els.status.className = type;
@@ -270,9 +322,10 @@ export function renderMiniAppHtml(): string {
         requests.forEach((r) => {
           const node = document.createElement('div');
           node.className = 'request';
+          const statusLabel = statusLabels[r.status] || r.status;
           node.innerHTML = [
-            '<div><span class="pill">' + r.status + '</span> <strong>' + (r.topic || '-') + '</strong></div>',
-            '<div class="small muted">' + r.start_at + ' → ' + r.end_at + '</div>',
+            '<div><span class="pill">' + statusLabel + '</span> <strong>' + (r.topic || '-') + '</strong></div>',
+            '<div class="small muted">' + formatDateRange(r.start_at, r.end_at) + '</div>',
             '<div class="actions"></div>'
           ].join('');
           const actions = node.querySelector('.actions');
@@ -307,7 +360,7 @@ export function renderMiniAppHtml(): string {
 
           if (mode === 'admin') {
             const approve = document.createElement('button');
-            approve.textContent = 'Approve';
+            approve.textContent = 'Подтвердить';
             approve.className = 'lime';
             approve.onclick = async () => {
               await api('/api/webapp/admin/requests/' + r.id + '/approve', { method: 'POST' });
@@ -316,7 +369,7 @@ export function renderMiniAppHtml(): string {
             actions.appendChild(approve);
 
             const reject = document.createElement('button');
-            reject.textContent = 'Reject';
+            reject.textContent = 'Отклонить';
             reject.className = 'danger';
             reject.onclick = async () => {
               const comment = prompt('Комментарий (опционально):', '') || null;
@@ -329,7 +382,7 @@ export function renderMiniAppHtml(): string {
             actions.appendChild(reject);
 
             const cancel = document.createElement('button');
-            cancel.textContent = 'Cancel';
+            cancel.textContent = 'Отменить';
             cancel.onclick = async () => {
               await api('/api/webapp/admin/requests/' + r.id + '/cancel', { method: 'POST' });
               await loadAdminRequests();
@@ -337,7 +390,7 @@ export function renderMiniAppHtml(): string {
             actions.appendChild(cancel);
 
             const reschedule = document.createElement('button');
-            reschedule.textContent = 'Reschedule';
+            reschedule.textContent = 'Перенести';
             reschedule.onclick = async () => {
               const start = prompt('Новый start_at ISO', r.start_at);
               const end = prompt('Новый end_at ISO', r.end_at);
@@ -397,7 +450,7 @@ export function renderMiniAppHtml(): string {
         const user = data.user || {};
         els.profileBlock.innerHTML = [
           '<div><strong>' + (user.first_name || '-') + ' ' + (user.last_name || '') + '</strong></div>',
-          '<div class="muted">@' + (user.username || '-') + ' / role: ' + role + '</div>'
+          '<div class="muted">@' + (user.username || '-') + ' / роль: ' + (role === 'admin' ? 'админ' : 'пользователь') + '</div>'
         ].join('');
 
         if (role === 'admin') {
@@ -433,17 +486,32 @@ export function renderMiniAppHtml(): string {
         const duration = Number(els.fDuration.value || 30);
         const data = await api('/api/webapp/slots?duration=' + duration);
         slotsCache = data.slots || [];
+        selectedSlotIndex = null;
         els.fSlot.innerHTML = '';
+
+        if (!slotsCache.length) {
+          els.fSlot.innerHTML = '<div class="muted">Свободных слотов нет.</div>';
+          return;
+        }
+
         slotsCache.forEach((slot, index) => {
-          const opt = document.createElement('option');
-          opt.value = String(index);
-          opt.textContent = slot.label + ' (' + slot.start_at + ')';
-          els.fSlot.appendChild(opt);
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'slot-item';
+          const start = formatDateParts(slot.start_at);
+          const end = formatDateParts(slot.end_at);
+          btn.innerHTML = '<div class="slot-date">' + start.date + '</div><div class="slot-time">' + start.time + '–' + end.time + ' (МСК)</div>';
+          btn.onclick = () => {
+            selectedSlotIndex = index;
+            els.fSlot.querySelectorAll('.slot-item').forEach((n) => n.classList.remove('active'));
+            btn.classList.add('active');
+          };
+          els.fSlot.appendChild(btn);
         });
       });
 
       document.getElementById('btnSubmitRequest').addEventListener('click', async () => {
-        const slot = slotsCache[Number(els.fSlot.value || 0)];
+        const slot = selectedSlotIndex === null ? null : slotsCache[selectedSlotIndex];
         if (!slot) {
           alert('Сначала выбери слот');
           return;
