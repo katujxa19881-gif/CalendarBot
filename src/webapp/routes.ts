@@ -7,7 +7,12 @@ import { getMiniAppConfig } from "../env";
 import { logEvent } from "../logger";
 import { ensureWizardStateForUser } from "../telegram/bot";
 import { buildAvailableSlots, ensureSlotStillAvailable, isSupportedDuration } from "../application/slots";
-import { authenticateMiniApp, MiniAppAuthError, verifyMiniAppSessionToken } from "./auth";
+import {
+  authenticateMiniApp,
+  authenticateMiniAppBrowserDev,
+  MiniAppAuthError,
+  verifyMiniAppSessionToken
+} from "./auth";
 import {
   approveMeetingRequestByAdmin,
   cancelMeetingRequest,
@@ -28,6 +33,14 @@ type SessionContext = {
 const authBodySchema = z.object({
   initData: z.string().min(1)
 });
+const browserAuthBodySchema = z
+  .object({
+    telegram_id: z.string().trim().min(1).optional(),
+    username: z.string().trim().min(1).optional(),
+    first_name: z.string().trim().min(1).optional(),
+    last_name: z.string().trim().min(1).optional()
+  })
+  .strict();
 const durationQuerySchema = z.object({
   duration: z.coerce.number().int().positive(),
   exclude_request_id: z.string().min(1).optional()
@@ -189,6 +202,11 @@ function parseDateOrNull(input: string | undefined): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function isLocalBrowserHost(host: string | undefined): boolean {
+  const cleanHost = (host ?? "").split(":")[0]?.trim().toLowerCase() ?? "";
+  return cleanHost === "localhost" || cleanHost === "127.0.0.1" || cleanHost === "::1" || cleanHost === "[::1]";
+}
+
 export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void> {
   app.get("/miniapp", async (_request: FastifyRequest, reply: FastifyReply) => {
     const miniAppConfig = getMiniAppConfig();
@@ -251,6 +269,79 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
         error_message: error instanceof Error ? error.message : "Mini app auth failed",
         details: {
           channel: "webapp"
+        }
+      });
+      replyAuthError(reply, error);
+    }
+  });
+
+  app.post("/api/webapp/auth/dev", async (request: FastifyRequest, reply: FastifyReply) => {
+    const miniAppConfig = getMiniAppConfig();
+    if (!miniAppConfig.enabled) {
+      reply.code(404).send({ ok: false, error: "MINI_APP_DISABLED" });
+      return;
+    }
+
+    if (!miniAppConfig.browserAuthEnabled) {
+      reply.code(404).send({ ok: false, error: "MINI_APP_BROWSER_AUTH_DISABLED" });
+      return;
+    }
+
+    if (!isLocalBrowserHost(request.hostname)) {
+      reply.code(403).send({ ok: false, error: "MINI_APP_BROWSER_AUTH_FORBIDDEN" });
+      return;
+    }
+
+    const parsedBody = browserAuthBodySchema.safeParse(request.body ?? {});
+    if (!parsedBody.success) {
+      reply.code(400).send({
+        ok: false,
+        error: "AUTH_PAYLOAD_INVALID"
+      });
+      return;
+    }
+
+    try {
+      const session = await authenticateMiniAppBrowserDev({
+        telegramId: parsedBody.data.telegram_id,
+        username: parsedBody.data.username,
+        firstName: parsedBody.data.first_name,
+        lastName: parsedBody.data.last_name
+      });
+
+      logEvent({
+        operation: "mini_app_auth_success",
+        status: "ok",
+        user_id: session.user.id,
+        details: {
+          channel: "webapp",
+          role: session.role,
+          mode: "browser_dev"
+        }
+      });
+
+      reply.code(200).send({
+        ok: true,
+        token: session.token,
+        expires_at: session.expiresAt,
+        role: session.role,
+        user: {
+          telegram_id: session.user.telegramId,
+          username: session.user.username,
+          first_name: session.user.firstName,
+          last_name: session.user.lastName
+        }
+      });
+    } catch (error) {
+      logEvent({
+        level: "warn",
+        operation: "mini_app_auth_failed",
+        status: "error",
+        error_code: error instanceof MiniAppAuthError ? error.code : "UNKNOWN_AUTH_ERROR",
+        error_message: error instanceof Error ? error.message : "Mini app dev auth failed",
+        details: {
+          channel: "webapp",
+          mode: "browser_dev"
         }
       });
       replyAuthError(reply, error);

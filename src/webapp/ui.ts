@@ -433,15 +433,22 @@ export function renderMiniAppHtml(): string {
 
       async function bootstrap() {
         const initData = tg && tg.initData ? tg.initData : '';
-        if (!initData) {
-          setStatus('Mini App можно открыть только из Telegram', 'err');
-          return;
-        }
+        let auth = null;
+        let browserDevMode = false;
 
-        const auth = await api('/api/webapp/auth', {
-          method: 'POST',
-          body: JSON.stringify({ initData })
-        });
+        if (initData) {
+          auth = await api('/api/webapp/auth', {
+            method: 'POST',
+            body: JSON.stringify({ initData })
+          });
+        } else {
+          browserDevMode = true;
+          setStatus('Локальный режим теста (без Telegram)...');
+          auth = await api('/api/webapp/auth/dev', {
+            method: 'POST',
+            body: JSON.stringify({})
+          });
+        }
 
         token = auth.token;
         const data = await api('/api/webapp/bootstrap');
@@ -471,7 +478,7 @@ export function renderMiniAppHtml(): string {
         await loadAdminSettings();
 
         els.appRoot.classList.remove('hidden');
-        setStatus('Подключено', 'ok');
+        setStatus(browserDevMode ? 'Подключено (локальный режим)' : 'Подключено', 'ok');
       }
 
       document.querySelectorAll('.tabs button[data-tab]').forEach((btn) => {
@@ -566,7 +573,12 @@ export function renderMiniAppHtml(): string {
       });
 
       bootstrap().catch((error) => {
-        setStatus('Ошибка: ' + (error && error.message ? error.message : 'unknown'), 'err');
+        const message = error && error.message ? error.message : 'unknown';
+        if (message === 'MINI_APP_BROWSER_AUTH_DISABLED') {
+          setStatus('Локальный доступ выключен: включи MINI_APP_BROWSER_AUTH_ENABLED=true', 'err');
+          return;
+        }
+        setStatus('Ошибка: ' + message, 'err');
       });
     })();
   </script>

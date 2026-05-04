@@ -99,25 +99,31 @@ export function getBackgroundJobsConfig(): {
 export function getMiniAppConfig(): {
   enabled: boolean;
   adminEnabled: boolean;
+  browserAuthEnabled: boolean;
   onboardingEnabled: boolean;
   authMaxAgeSeconds: number;
   sessionTtlSeconds: number;
   sessionSecret: string | null;
   webAppUrl: string | null;
   menuButtonText: string;
+  browserAuthTelegramId: string | null;
 } {
   const enabledRaw = (process.env.MINI_APP_ENABLED ?? "false").trim().toLowerCase();
   const adminEnabledRaw = (process.env.MINI_APP_ADMIN_ENABLED ?? "false").trim().toLowerCase();
+  const browserAuthEnabledRaw = (process.env.MINI_APP_BROWSER_AUTH_ENABLED ?? "false").trim().toLowerCase();
   const onboardingEnabledRaw = (process.env.MINI_APP_ONBOARDING_ENABLED ?? "true").trim().toLowerCase();
   const authMaxAgeSeconds = Number(process.env.MINI_APP_AUTH_MAX_AGE_SECONDS ?? 86400);
   const sessionTtlSeconds = Number(process.env.MINI_APP_SESSION_TTL_SECONDS ?? 43200);
   const sessionSecret = process.env.MINI_APP_SESSION_SECRET ?? process.env.TELEGRAM_BOT_TOKEN ?? null;
   const webAppUrl = process.env.MINI_APP_URL ?? null;
   const menuButtonText = process.env.MINI_APP_MENU_BUTTON_TEXT ?? "Открыть NexaMeet";
+  const browserAuthTelegramId = (process.env.MINI_APP_BROWSER_AUTH_TELEGRAM_ID ?? "").trim() || null;
 
   return {
     enabled: enabledRaw === "1" || enabledRaw === "true" || enabledRaw === "yes",
     adminEnabled: adminEnabledRaw === "1" || adminEnabledRaw === "true" || adminEnabledRaw === "yes",
+    browserAuthEnabled:
+      browserAuthEnabledRaw === "1" || browserAuthEnabledRaw === "true" || browserAuthEnabledRaw === "yes",
     onboardingEnabled: onboardingEnabledRaw !== "0" && onboardingEnabledRaw !== "false" && onboardingEnabledRaw !== "no",
     authMaxAgeSeconds:
       Number.isFinite(authMaxAgeSeconds) && authMaxAgeSeconds > 0
@@ -129,6 +135,7 @@ export function getMiniAppConfig(): {
         : 43200,
     sessionSecret,
     webAppUrl,
-    menuButtonText
+    menuButtonText,
+    browserAuthTelegramId
   };
 }

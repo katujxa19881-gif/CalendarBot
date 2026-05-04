@@ -246,6 +246,62 @@ export async function authenticateMiniApp(initDataRaw: string): Promise<{
   };
 }
 
+export async function authenticateMiniAppBrowserDev(input?: {
+  telegramId?: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+}): Promise<{
+  token: string;
+  expiresAt: string;
+  role: "user" | "admin";
+  user: User;
+}> {
+  assertFeatureEnabled();
+
+  const miniAppConfig = getMiniAppConfig();
+  if (!miniAppConfig.browserAuthEnabled) {
+    throw new MiniAppAuthError("MINI_APP_DISABLED", "Browser dev auth is disabled");
+  }
+
+  const { adminTelegramId } = getApprovalConfig();
+  const telegramId =
+    input?.telegramId?.trim() ||
+    miniAppConfig.browserAuthTelegramId ||
+    adminTelegramId ||
+    "900001";
+  const parsedTelegramId = Number(telegramId);
+  if (!Number.isFinite(parsedTelegramId)) {
+    throw new MiniAppAuthError("INIT_DATA_INVALID", "Browser dev telegram id is invalid");
+  }
+
+  const user = await upsertUserFromWebApp({
+    id: parsedTelegramId,
+    username: input?.username?.trim() || "browser_dev_user",
+    first_name: input?.firstName?.trim() || "Local",
+    last_name: input?.lastName?.trim() || "Tester"
+  });
+
+  const role = buildRole(user.telegramId);
+  if (role === "admin" && !miniAppConfig.adminEnabled) {
+    throw new MiniAppAuthError("MINI_APP_DISABLED", "Mini app admin mode is disabled");
+  }
+
+  const exp = Math.floor(Date.now() / 1000) + miniAppConfig.sessionTtlSeconds;
+  const token = createSessionToken({
+    telegramId: user.telegramId,
+    role,
+    exp
+  });
+
+  return {
+    token,
+    expiresAt: new Date(exp * 1000).toISOString(),
+    role,
+    user
+  };
+}
+
 export async function verifyMiniAppSessionToken(token: string): Promise<{
   user: User;
   role: "user" | "admin";
