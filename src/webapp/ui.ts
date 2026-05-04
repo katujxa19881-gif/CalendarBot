@@ -129,6 +129,29 @@ export function renderMiniAppHtml(): string {
       box-shadow: 0 0 0 1px rgba(0,229,255,.25) inset;
       background: #10253b;
     }
+    details.group {
+      border: 1px solid #1b344a;
+      border-radius: 12px;
+      padding: 8px 10px;
+      margin: 8px 0;
+      background: rgba(9, 19, 32, .6);
+    }
+    details.group > summary {
+      cursor: pointer;
+      list-style: none;
+      font-weight: 700;
+      color: #b9dbf3;
+      outline: none;
+    }
+    details.group > summary::-webkit-details-marker { display: none; }
+    .group-count { color: var(--muted); font-weight: 500; margin-left: 6px; }
+    .hero {
+      border: 1px solid #19486a;
+      border-radius: 14px;
+      padding: 12px;
+      background: linear-gradient(135deg, rgba(0,229,255,.10), rgba(163,255,18,.08));
+      margin-top: 10px;
+    }
     .slot-date { color: #cce8ff; }
     .slot-time { color: #7af4ff; font-weight: 700; }
   </style>
@@ -205,10 +228,6 @@ export function renderMiniAppHtml(): string {
       </section>
 
       <section id="tab-admin" class="card hidden">
-        <h2>Админ — заявки</h2>
-        <button id="btnReloadAdmin">Обновить</button>
-        <div id="adminRequests" class="row"></div>
-        <hr style="border-color:#173049; opacity:.5; margin:12px 0" />
         <h2>Админ — настройки</h2>
         <div class="grid2">
           <label>Начало дня <input id="sStart" type="number" /></label>
@@ -221,6 +240,10 @@ export function renderMiniAppHtml(): string {
         <div class="row">
           <button id="btnSaveSettings" class="lime">Сохранить настройки</button>
         </div>
+        <hr style="border-color:#173049; opacity:.5; margin:12px 0" />
+        <h2>Заявки</h2>
+        <button id="btnReloadAdmin">Обновить</button>
+        <div id="adminRequests" class="row"></div>
       </section>
     </div>
   </div>
@@ -274,6 +297,23 @@ export function renderMiniAppHtml(): string {
         EXPIRED: 'Истекла'
       };
 
+      const adminActionRules = {
+        canApprove: (status) => status === 'PENDING_APPROVAL',
+        canReject: (status) => status === 'PENDING_APPROVAL',
+        canCancel: (status) => ['PENDING_APPROVAL', 'APPROVED', 'RESCHEDULE_REQUESTED', 'RESCHEDULED'].includes(status),
+        canReschedule: (status) => ['APPROVED', 'RESCHEDULED'].includes(status)
+      };
+
+      function normalizeTopic(topic) {
+        const t = (topic || '').trim();
+        if (!t) return 'Без темы';
+        const low = t.toLowerCase();
+        if (low.includes('stage') || low.includes('stage9') || low.includes('stage10')) {
+          return 'Тестовая заявка';
+        }
+        return t;
+      }
+
       function formatDateParts(iso) {
         const d = new Date(iso);
         return {
@@ -294,7 +334,10 @@ export function renderMiniAppHtml(): string {
       }
 
       async function api(url, options = {}) {
-        const headers = Object.assign({ 'Content-Type': 'application/json' }, options.headers || {});
+        const headers = Object.assign({}, options.headers || {});
+        if (options.body !== undefined && !headers['Content-Type'] && !headers['content-type']) {
+          headers['Content-Type'] = 'application/json';
+        }
         if (token) headers['Authorization'] = 'Bearer ' + token;
         const response = await fetch(url, Object.assign({}, options, { headers }));
         const data = await response.json().catch(() => ({}));
@@ -302,6 +345,11 @@ export function renderMiniAppHtml(): string {
           throw new Error(data.error || ('HTTP ' + response.status));
         }
         return data;
+      }
+
+      function showActionError(error) {
+        const message = error && error.message ? error.message : 'Неизвестная ошибка';
+        alert('Операция не выполнена: ' + message);
       }
 
       function switchTab(tab) {
@@ -319,12 +367,24 @@ export function renderMiniAppHtml(): string {
           container.innerHTML = '<div class="muted">Пусто</div>';
           return;
         }
-        requests.forEach((r) => {
+
+        const groups = mode === 'admin' || mode === 'my'
+          ? [
+              { key: 'PENDING_APPROVAL', title: 'На согласовании' },
+              { key: 'APPROVED', title: 'Подтвержденные' },
+              { key: 'RESCHEDULED', title: 'Перенесенные' },
+              { key: 'REJECTED', title: 'Отклоненные' },
+              { key: 'CANCELLED', title: 'Отмененные' },
+              { key: 'EXPIRED', title: 'Истекшие' }
+            ]
+          : [];
+
+        const renderCard = (r) => {
           const node = document.createElement('div');
           node.className = 'request';
           const statusLabel = statusLabels[r.status] || r.status;
           node.innerHTML = [
-            '<div><span class="pill">' + statusLabel + '</span> <strong>' + (r.topic || '-') + '</strong></div>',
+            '<div><span class="pill">' + statusLabel + '</span> <strong>' + normalizeTopic(r.topic) + '</strong></div>',
             '<div class="small muted">' + formatDateRange(r.start_at, r.end_at) + '</div>',
             '<div class="actions"></div>'
           ].join('');
@@ -336,8 +396,13 @@ export function renderMiniAppHtml(): string {
               cancelBtn.textContent = 'Отменить';
               cancelBtn.className = 'danger';
               cancelBtn.onclick = async () => {
-                await api('/api/webapp/requests/' + r.id + '/cancel', { method: 'POST' });
-                await loadMyRequests();
+                try {
+                  await api('/api/webapp/requests/' + r.id + '/cancel', { method: 'POST', body: '{}' });
+                  await loadMyRequests();
+                } catch (error) {
+                  showActionError(error);
+                  await loadMyRequests();
+                }
               };
               actions.appendChild(cancelBtn);
             }
@@ -348,63 +413,111 @@ export function renderMiniAppHtml(): string {
                 const start = prompt('Новый start_at ISO', r.start_at);
                 const end = prompt('Новый end_at ISO', r.end_at);
                 if (!start || !end) return;
-                await api('/api/webapp/requests/' + r.id + '/reschedule', {
-                  method: 'POST',
-                  body: JSON.stringify({ start_at: start, end_at: end })
-                });
-                await loadMyRequests();
+                try {
+                  await api('/api/webapp/requests/' + r.id + '/reschedule', {
+                    method: 'POST',
+                    body: JSON.stringify({ start_at: start, end_at: end })
+                  });
+                  await loadMyRequests();
+                } catch (error) {
+                  showActionError(error);
+                  await loadMyRequests();
+                }
               };
               actions.appendChild(rsBtn);
             }
           }
 
           if (mode === 'admin') {
-            const approve = document.createElement('button');
-            approve.textContent = 'Подтвердить';
-            approve.className = 'lime';
-            approve.onclick = async () => {
-              await api('/api/webapp/admin/requests/' + r.id + '/approve', { method: 'POST' });
-              await loadAdminRequests();
-            };
-            actions.appendChild(approve);
+            if (adminActionRules.canApprove(r.status)) {
+              const approve = document.createElement('button');
+              approve.textContent = 'Подтвердить';
+              approve.className = 'lime';
+              approve.onclick = async () => {
+                try {
+                  await api('/api/webapp/admin/requests/' + r.id + '/approve', { method: 'POST', body: '{}' });
+                  await loadAdminRequests();
+                } catch (error) {
+                  showActionError(error);
+                  await loadAdminRequests();
+                }
+              };
+              actions.appendChild(approve);
+            }
 
-            const reject = document.createElement('button');
-            reject.textContent = 'Отклонить';
-            reject.className = 'danger';
-            reject.onclick = async () => {
-              const comment = prompt('Комментарий (опционально):', '') || null;
-              await api('/api/webapp/admin/requests/' + r.id + '/reject', {
-                method: 'POST',
-                body: JSON.stringify({ comment })
-              });
-              await loadAdminRequests();
-            };
-            actions.appendChild(reject);
+            if (adminActionRules.canReject(r.status)) {
+              const reject = document.createElement('button');
+              reject.textContent = 'Отклонить';
+              reject.className = 'danger';
+              reject.onclick = async () => {
+                const comment = prompt('Комментарий (опционально):', '') || null;
+                try {
+                  await api('/api/webapp/admin/requests/' + r.id + '/reject', {
+                    method: 'POST',
+                    body: JSON.stringify({ comment })
+                  });
+                  await loadAdminRequests();
+                } catch (error) {
+                  showActionError(error);
+                  await loadAdminRequests();
+                }
+              };
+              actions.appendChild(reject);
+            }
 
-            const cancel = document.createElement('button');
-            cancel.textContent = 'Отменить';
-            cancel.onclick = async () => {
-              await api('/api/webapp/admin/requests/' + r.id + '/cancel', { method: 'POST' });
-              await loadAdminRequests();
-            };
-            actions.appendChild(cancel);
+            if (adminActionRules.canCancel(r.status)) {
+              const cancel = document.createElement('button');
+              cancel.textContent = 'Отменить';
+              cancel.onclick = async () => {
+                try {
+                  await api('/api/webapp/admin/requests/' + r.id + '/cancel', { method: 'POST', body: '{}' });
+                  await loadAdminRequests();
+                } catch (error) {
+                  showActionError(error);
+                  await loadAdminRequests();
+                }
+              };
+              actions.appendChild(cancel);
+            }
 
-            const reschedule = document.createElement('button');
-            reschedule.textContent = 'Перенести';
-            reschedule.onclick = async () => {
-              const start = prompt('Новый start_at ISO', r.start_at);
-              const end = prompt('Новый end_at ISO', r.end_at);
-              if (!start || !end) return;
-              await api('/api/webapp/admin/requests/' + r.id + '/reschedule', {
-                method: 'POST',
-                body: JSON.stringify({ start_at: start, end_at: end })
-              });
-              await loadAdminRequests();
-            };
-            actions.appendChild(reschedule);
+            if (adminActionRules.canReschedule(r.status)) {
+              const reschedule = document.createElement('button');
+              reschedule.textContent = 'Перенести';
+              reschedule.onclick = async () => {
+                const start = prompt('Новый start_at ISO', r.start_at);
+                const end = prompt('Новый end_at ISO', r.end_at);
+                if (!start || !end) return;
+                try {
+                  await api('/api/webapp/admin/requests/' + r.id + '/reschedule', {
+                    method: 'POST',
+                    body: JSON.stringify({ start_at: start, end_at: end })
+                  });
+                  await loadAdminRequests();
+                } catch (error) {
+                  showActionError(error);
+                  await loadAdminRequests();
+                }
+              };
+              actions.appendChild(reschedule);
+            }
           }
+          return node;
+        };
 
-          container.appendChild(node);
+        if (mode !== 'admin' && mode !== 'my') {
+          requests.forEach((r) => container.appendChild(renderCard(r)));
+          return;
+        }
+
+        groups.forEach((group, index) => {
+          const subset = requests.filter((r) => r.status === group.key);
+          if (!subset.length) return;
+          const details = document.createElement('details');
+          details.className = 'group';
+          if (index === 0) details.open = true;
+          details.innerHTML = '<summary>' + group.title + '<span class="group-count">(' + subset.length + ')</span></summary>';
+          subset.forEach((r) => details.appendChild(renderCard(r)));
+          container.appendChild(details);
         });
       }
 
@@ -457,7 +570,8 @@ export function renderMiniAppHtml(): string {
         const user = data.user || {};
         els.profileBlock.innerHTML = [
           '<div><strong>' + (user.first_name || '-') + ' ' + (user.last_name || '') + '</strong></div>',
-          '<div class="muted">@' + (user.username || '-') + ' / роль: ' + (role === 'admin' ? 'админ' : 'пользователь') + '</div>'
+          '<div class="muted">@' + (user.username || '-') + ' / роль: ' + (role === 'admin' ? 'админ' : 'пользователь') + '</div>',
+          '<div class="hero"><strong>Запись на консультацию к Екатерине</strong><div class="small muted">Здесь можно быстро выбрать удобное время и записаться на консультацию по AI-вайбкодингу и финансовому планированию с ИИ. Создайте заявку, выберите слот и отслеживайте статус в одном месте.</div></div>'
         ].join('');
 
         if (role === 'admin') {
@@ -490,6 +604,19 @@ export function renderMiniAppHtml(): string {
       });
 
       document.getElementById('btnLoadSlots').addEventListener('click', async () => {
+        const toMoscowDate = (iso) => new Date(new Date(iso).getTime() + 3 * 60 * 60 * 1000);
+        const fmtDay = (date) => new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit' }).format(date);
+        const weekKey = (iso) => {
+          const d = toMoscowDate(iso);
+          const day = d.getUTCDay() || 7;
+          const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - (day - 1)));
+          const sunday = new Date(Date.UTC(monday.getUTCFullYear(), monday.getUTCMonth(), monday.getUTCDate() + 6));
+          return {
+            id: monday.toISOString().slice(0, 10),
+            label: 'Неделя ' + fmtDay(monday) + ' - ' + fmtDay(sunday)
+          };
+        };
+
         const duration = Number(els.fDuration.value || 30);
         const data = await api('/api/webapp/slots?duration=' + duration);
         slotsCache = data.slots || [];
@@ -501,19 +628,34 @@ export function renderMiniAppHtml(): string {
           return;
         }
 
+        const grouped = new Map();
         slotsCache.forEach((slot, index) => {
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'slot-item';
-          const start = formatDateParts(slot.start_at);
-          const end = formatDateParts(slot.end_at);
-          btn.innerHTML = '<div class="slot-date">' + start.date + '</div><div class="slot-time">' + start.time + '–' + end.time + ' (МСК)</div>';
-          btn.onclick = () => {
-            selectedSlotIndex = index;
-            els.fSlot.querySelectorAll('.slot-item').forEach((n) => n.classList.remove('active'));
-            btn.classList.add('active');
-          };
-          els.fSlot.appendChild(btn);
+          const wk = weekKey(slot.start_at);
+          if (!grouped.has(wk.id)) grouped.set(wk.id, { label: wk.label, items: [] });
+          grouped.get(wk.id).items.push({ slot, index });
+        });
+
+        [...grouped.values()].forEach((week, weekIndex) => {
+          const details = document.createElement('details');
+          details.className = 'group';
+          if (weekIndex === 0) details.open = true;
+          details.innerHTML = '<summary>' + week.label + '<span class="group-count">(' + week.items.length + ')</span></summary>';
+
+          week.items.forEach(({ slot, index }) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'slot-item';
+            const start = formatDateParts(slot.start_at);
+            const end = formatDateParts(slot.end_at);
+            btn.innerHTML = '<div class="slot-date">' + start.date + '</div><div class="slot-time">' + start.time + '–' + end.time + ' (МСК)</div>';
+            btn.onclick = () => {
+              selectedSlotIndex = index;
+              els.fSlot.querySelectorAll('.slot-item').forEach((n) => n.classList.remove('active'));
+              btn.classList.add('active');
+            };
+            details.appendChild(btn);
+          });
+          els.fSlot.appendChild(details);
         });
       });
 

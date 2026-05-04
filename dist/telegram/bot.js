@@ -230,13 +230,15 @@ function formatDateRangeMoscow(startAt, endAt) {
     return `${formatDateMoscow(startAt)} ${formatTimeMoscow(startAt)} - ${formatTimeMoscow(endAt)} (МСК)`;
 }
 function formatRequestCode(meetingRequest) {
-    const createdAt = new Date(meetingRequest.createdAt);
-    const y = createdAt.getUTCFullYear();
-    const m = String(createdAt.getUTCMonth() + 1).padStart(2, "0");
-    const d = String(createdAt.getUTCDate()).padStart(2, "0");
-    const hh = String(createdAt.getUTCHours()).padStart(2, "0");
-    const mm = String(createdAt.getUTCMinutes()).padStart(2, "0");
-    return `REQ-${y}${m}${d}-${hh}${mm}`;
+    const parts = new Intl.DateTimeFormat("ru-RU", {
+        timeZone: "Europe/Moscow",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23"
+    }).formatToParts(new Date(meetingRequest.createdAt));
+    const hh = parts.find((part) => part.type === "hour")?.value ?? "00";
+    const mm = parts.find((part) => part.type === "minute")?.value ?? "00";
+    return `#${hh}${mm}`;
 }
 function formatHistoryStatus(status) {
     switch (status) {

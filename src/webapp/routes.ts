@@ -426,7 +426,8 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
     const slots = await buildAvailableSlots({
       durationMinutes: parsedQuery.data.duration,
       excludeMeetingRequestId: parsedQuery.data.exclude_request_id,
-      channel: "webapp"
+      channel: "webapp",
+      limitOverride: 180
     });
 
     reply.code(200).send({

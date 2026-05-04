@@ -182,6 +182,7 @@ export async function buildAvailableSlots(input: {
   durationMinutes: number;
   excludeMeetingRequestId?: string;
   channel?: "bot" | "webapp";
+  limitOverride?: number;
 }): Promise<AvailableSlot[]> {
   const settings = await getMeetingSettings();
   const candidates = buildCandidateSlots(input.durationMinutes, settings);
@@ -197,9 +198,8 @@ export async function buildAvailableSlots(input: {
   const rangeEnd = new Date(lastCandidate.endAt.getTime() + settings.slotBufferMinutes * 60 * 1000);
   const busyIntervals = await getBusyIntervalsForRange(rangeStart, rangeEnd, input.excludeMeetingRequestId);
 
-  const available = candidates
-    .filter((slot) => isSlotAvailable(slot, busyIntervals, settings))
-    .slice(0, settings.slotLimit);
+  const limit = Number.isFinite(input.limitOverride) && (input.limitOverride ?? 0) > 0 ? input.limitOverride! : settings.slotLimit;
+  const available = candidates.filter((slot) => isSlotAvailable(slot, busyIntervals, settings)).slice(0, limit);
 
   logEvent({
     operation: "slots_built",
@@ -209,7 +209,7 @@ export async function buildAvailableSlots(input: {
       candidates_count: candidates.length,
       busy_count: busyIntervals.length,
       slots_count: available.length,
-      slot_limit: settings.slotLimit,
+      slot_limit: limit,
       channel: input.channel ?? "bot"
     }
   });
