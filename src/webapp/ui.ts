@@ -103,6 +103,7 @@ export function renderMiniAppHtml(): string {
     .request { border: 1px solid #1b344a; border-radius: 12px; padding: 10px; margin: 8px 0; display: grid; gap: 8px; }
     .request-head { min-height: 46px; display: grid; align-content: start; gap: 4px; }
     .request-title { line-height: 1.3; }
+    .request-select { margin-right: 8px; transform: translateY(1px); width: 16px; height: 16px; accent-color: var(--cyan); }
     .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
     .actions button { min-height: 44px; }
     .actions button.ghost {
@@ -321,6 +322,18 @@ export function renderMiniAppHtml(): string {
           <label>Лимит
             <input id="aLimit" type="number" min="1" max="100" value="30" />
           </label>
+          <label>Автоочистка, дней
+            <input id="aAutoDays" type="number" min="1" max="365" value="7" />
+          </label>
+        </div>
+        <div class="grid2">
+          <label><input id="aAutoEnabled" type="checkbox" checked /> Автоочистка закрытых при открытии админки</label>
+        </div>
+        <div class="grid2">
+          <button id="btnSelectClosed">Выбрать закрытые</button>
+          <button id="btnClearSelected" class="danger">Очистить выбранные</button>
+          <button id="btnClearClosed">Очистить закрытые по сроку</button>
+          <button id="btnClearAllClosed" class="danger">Очистить все закрытые</button>
         </div>
         <button id="btnReloadAdmin">Обновить</button>
         <div id="adminRequests" class="row"></div>
@@ -376,7 +389,9 @@ export function renderMiniAppHtml(): string {
         aStatus: document.getElementById('aStatus'),
         aFrom: document.getElementById('aFrom'),
         aTo: document.getElementById('aTo'),
-        aLimit: document.getElementById('aLimit')
+        aLimit: document.getElementById('aLimit'),
+        aAutoDays: document.getElementById('aAutoDays'),
+        aAutoEnabled: document.getElementById('aAutoEnabled')
       };
       const modalEls = {
         backdrop: document.getElementById('replyModalBackdrop'),
@@ -392,6 +407,7 @@ export function renderMiniAppHtml(): string {
       let slotsCache = [];
       let selectedSlotIndex = null;
       let replyModalResolver = null;
+      let adminSelectedRequestIds = new Set();
 
       const statusLabels = {
         NEW: 'Новая',
@@ -552,6 +568,7 @@ export function renderMiniAppHtml(): string {
 
       const AUTO_CLEAN_DAYS = 21;
       const AUTO_CLEAN_STATUSES = new Set(['REJECTED', 'CANCELLED', 'EXPIRED']);
+      const MANUAL_CLEAN_STATUSES = new Set(['REJECTED', 'CANCELLED', 'EXPIRED']);
 
       function shouldAutoHideRequest(r, mode) {
         if (mode !== 'admin' && mode !== 'my') return false;
@@ -586,12 +603,29 @@ export function renderMiniAppHtml(): string {
           const node = document.createElement('div');
           node.className = 'request';
           const statusLabel = statusLabels[r.status] || r.status;
+          const canManualClean = mode === 'admin' && MANUAL_CLEAN_STATUSES.has(String(r.status || ''));
+          const isSelected = canManualClean && adminSelectedRequestIds.has(r.id);
+          const selectionHtml = canManualClean
+            ? '<label><input class="request-select" type="checkbox" data-request-select="' + r.id + '"' + (isSelected ? ' checked' : '') + ' />в очистку</label>'
+            : '';
           node.innerHTML = [
-            '<div class="request-head"><div class="request-title"><span class="pill">' + statusLabel + '</span> <strong>' + normalizeTopic(r.topic) + '</strong></div></div>',
+            '<div class="request-head"><div class="request-title">' + selectionHtml + '<span class="pill">' + statusLabel + '</span> <strong>' + normalizeTopic(r.topic) + '</strong></div></div>',
             '<div class="small muted">' + formatDateRange(r.start_at, r.end_at) + '</div>',
             '<div class="actions"></div>'
           ].join('');
           const actions = node.querySelector('.actions');
+          if (canManualClean) {
+            const cb = node.querySelector('input[data-request-select]');
+            if (cb) {
+              cb.addEventListener('change', (event) => {
+                if (event.target.checked) {
+                  adminSelectedRequestIds.add(r.id);
+                } else {
+                  adminSelectedRequestIds.delete(r.id);
+                }
+              });
+            }
+          }
 
           if (mode === 'my') {
             if (r.can_cancel) {
@@ -754,6 +788,35 @@ export function renderMiniAppHtml(): string {
         renderRequests(els.adminRequests, data.requests || [], 'admin');
       }
 
+      async function cleanupRequests(mode, olderThanDays) {
+        const payload = { mode };
+        if (mode === 'selected') {
+          payload.ids = [...adminSelectedRequestIds];
+        } else if (typeof olderThanDays === 'number') {
+          payload.older_than_days = olderThanDays;
+        }
+
+        return api('/api/webapp/admin/requests/cleanup', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+      }
+
+      async function runAutoCleanupIfEnabled() {
+        if (role !== 'admin') return;
+        if (!els.aAutoEnabled.checked) return;
+
+        const daysRaw = Number(els.aAutoDays.value || 7);
+        const days = Number.isFinite(daysRaw) ? Math.max(1, Math.min(365, Math.floor(daysRaw))) : 7;
+        const markerKey = 'miniapp_auto_cleanup_last_run';
+        const lastRun = Number(localStorage.getItem(markerKey) || 0);
+        const now = Date.now();
+        if (now - lastRun < 12 * 60 * 60 * 1000) return;
+
+        await cleanupRequests('closed', days);
+        localStorage.setItem(markerKey, String(now));
+      }
+
       async function loadAdminSettings() {
         if (role !== 'admin') return;
         const data = await api('/api/webapp/admin/settings');
@@ -820,6 +883,7 @@ export function renderMiniAppHtml(): string {
           if (btn.dataset.tab === 'admin') {
             const unlocked = await ensureAdminUnlocked();
             if (!unlocked) return;
+            await runAutoCleanupIfEnabled();
             await loadAdminRequests();
             await loadAdminSettings();
           }
@@ -915,6 +979,41 @@ export function renderMiniAppHtml(): string {
 
       document.getElementById('btnReloadMy').addEventListener('click', () => loadMyRequests());
       document.getElementById('btnReloadAdmin').addEventListener('click', () => loadAdminRequests());
+      document.getElementById('btnSelectClosed').addEventListener('click', async () => {
+        const data = await api('/api/webapp/admin/requests?limit=100');
+        const requests = data.requests || [];
+        adminSelectedRequestIds = new Set(
+          requests.filter((r) => MANUAL_CLEAN_STATUSES.has(String(r.status || ''))).map((r) => r.id)
+        );
+        await loadAdminRequests();
+      });
+      document.getElementById('btnClearSelected').addEventListener('click', async () => {
+        if (!adminSelectedRequestIds.size) {
+          alert('Нет выбранных заявок для очистки');
+          return;
+        }
+        if (!confirm('Удалить выбранные закрытые заявки без возможности восстановления?')) return;
+        const data = await cleanupRequests('selected');
+        adminSelectedRequestIds.clear();
+        alert('Удалено: ' + (data.deleted_count || 0));
+        await loadAdminRequests();
+      });
+      document.getElementById('btnClearClosed').addEventListener('click', async () => {
+        const daysRaw = Number(els.aAutoDays.value || 7);
+        const days = Number.isFinite(daysRaw) ? Math.max(1, Math.min(365, Math.floor(daysRaw))) : 7;
+        if (!confirm('Удалить закрытые заявки старше ' + days + ' дней?')) return;
+        const data = await cleanupRequests('closed', days);
+        adminSelectedRequestIds.clear();
+        alert('Удалено: ' + (data.deleted_count || 0));
+        await loadAdminRequests();
+      });
+      document.getElementById('btnClearAllClosed').addEventListener('click', async () => {
+        if (!confirm('Удалить все закрытые заявки? Действие необратимо.')) return;
+        const data = await cleanupRequests('closed', 0);
+        adminSelectedRequestIds.clear();
+        alert('Удалено: ' + (data.deleted_count || 0));
+        await loadAdminRequests();
+      });
 
       document.getElementById('btnSaveSettings').addEventListener('click', async () => {
         await api('/api/webapp/admin/settings', {

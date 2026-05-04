@@ -80,6 +80,13 @@ const patchSettingsBodySchema = z
     slot_horizon_days: z.number().int().optional()
   })
   .strict();
+const adminCleanupBodySchema = z
+  .object({
+    mode: z.enum(["selected", "closed"]),
+    ids: z.array(z.string().min(1)).max(500).optional(),
+    older_than_days: z.number().min(0).max(365).optional()
+  })
+  .strict();
 const submitRequestBodySchema = z.object({
   duration_minutes: z.number().int().positive(),
   format: z.enum(["ONLINE", "OFFLINE"]),
@@ -98,6 +105,11 @@ const ACTIVE_ACTION_STATUSES: MeetingRequestStatus[] = [
   MeetingRequestStatus.APPROVED,
   MeetingRequestStatus.RESCHEDULE_REQUESTED,
   MeetingRequestStatus.RESCHEDULED
+];
+const CLOSED_ACTION_STATUSES: MeetingRequestStatus[] = [
+  MeetingRequestStatus.REJECTED,
+  MeetingRequestStatus.CANCELLED,
+  MeetingRequestStatus.EXPIRED
 ];
 
 function isRescheduleAllowed(status: MeetingRequestStatus): boolean {
@@ -1146,6 +1158,101 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
     } catch (error) {
       replyOperationError(reply, error);
     }
+  });
+
+  app.post("/api/webapp/admin/requests/cleanup", async (request: FastifyRequest, reply: FastifyReply) => {
+    const miniAppConfig = getMiniAppConfig();
+    if (!miniAppConfig.enabled || !miniAppConfig.adminEnabled) {
+      reply.code(404).send({ ok: false, error: "MINI_APP_ADMIN_DISABLED" });
+      return;
+    }
+
+    const session = await requireAdminAccess(request, reply);
+    if (!session) {
+      return;
+    }
+
+    const parsedBody = adminCleanupBodySchema.safeParse(request.body ?? {});
+    if (!parsedBody.success) {
+      reply.code(400).send({
+        ok: false,
+        error: "CLEANUP_PAYLOAD_INVALID"
+      });
+      return;
+    }
+
+    const payload = parsedBody.data;
+
+    if (payload.mode === "selected") {
+      const ids = [...new Set(payload.ids ?? [])];
+      if (!ids.length) {
+        reply.code(400).send({ ok: false, error: "CLEANUP_IDS_REQUIRED" });
+        return;
+      }
+
+      const deletable = await prisma.meetingRequest.findMany({
+        where: {
+          id: { in: ids },
+          status: { in: CLOSED_ACTION_STATUSES }
+        },
+        select: { id: true }
+      });
+      const deletableIds = deletable.map((item) => item.id);
+
+      const deleted = deletableIds.length
+        ? await prisma.meetingRequest.deleteMany({
+            where: { id: { in: deletableIds } }
+          })
+        : { count: 0 };
+
+      logEvent({
+        operation: "admin_cleanup_completed",
+        status: "ok",
+        actor_id: session.user.telegramId,
+        details: {
+          mode: "selected",
+          requested_count: ids.length,
+          deleted_count: deleted.count,
+          channel: "webapp"
+        }
+      });
+
+      reply.code(200).send({
+        ok: true,
+        mode: "selected",
+        requested_count: ids.length,
+        deleted_count: deleted.count
+      });
+      return;
+    }
+
+    const olderThanDays = payload.older_than_days ?? 7;
+    const threshold = new Date(Date.now() - olderThanDays * 24 * 60 * 60 * 1000);
+    const deleted = await prisma.meetingRequest.deleteMany({
+      where: {
+        status: { in: CLOSED_ACTION_STATUSES },
+        endAt: { lt: threshold }
+      }
+    });
+
+    logEvent({
+      operation: "admin_cleanup_completed",
+      status: "ok",
+      actor_id: session.user.telegramId,
+      details: {
+        mode: "closed",
+        older_than_days: olderThanDays,
+        deleted_count: deleted.count,
+        channel: "webapp"
+      }
+    });
+
+    reply.code(200).send({
+      ok: true,
+      mode: "closed",
+      older_than_days: olderThanDays,
+      deleted_count: deleted.count
+    });
   });
 
   app.post("/api/webapp/admin/pin/verify", async (request: FastifyRequest, reply: FastifyReply) => {
