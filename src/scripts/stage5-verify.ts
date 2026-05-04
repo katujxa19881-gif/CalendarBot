@@ -7,7 +7,6 @@ import {
 import { connectDatabase, disconnectDatabase, prisma } from "../db";
 import { resolveDatabaseUrl } from "../env";
 import {
-  BusyInterval,
   CalendarEventCreateInput,
   CalendarEventCreateResult,
   CalendarEventUpdateInput,
@@ -183,12 +182,6 @@ async function run(): Promise<void> {
 
   const botToken = process.env.TELEGRAM_BOT_TOKEN ?? "123456:stage5verify";
 
-  const availabilityProvider = {
-    async getBusyIntervals(): Promise<BusyInterval[]> {
-      return [];
-    }
-  };
-
   let eventSeq = 0;
   const calendarEventSyncProvider = {
     async createEvent(input: CalendarEventCreateInput): Promise<CalendarEventCreateResult> {
@@ -215,7 +208,6 @@ async function run(): Promise<void> {
     botToken,
     webhookSecretToken: process.env.TELEGRAM_WEBHOOK_SECRET ?? null,
     dryRun: true,
-    availabilityProvider,
     calendarEventSyncProvider,
     adminTelegramId: ADMIN_TELEGRAM_ID
   });

@@ -113,7 +113,7 @@ export function getMiniAppConfig(): {
   const sessionTtlSeconds = Number(process.env.MINI_APP_SESSION_TTL_SECONDS ?? 43200);
   const sessionSecret = process.env.MINI_APP_SESSION_SECRET ?? process.env.TELEGRAM_BOT_TOKEN ?? null;
   const webAppUrl = process.env.MINI_APP_URL ?? null;
-  const menuButtonText = process.env.MINI_APP_MENU_BUTTON_TEXT ?? "Открыть Calendar";
+  const menuButtonText = process.env.MINI_APP_MENU_BUTTON_TEXT ?? "Открыть NexaMeet";
 
   return {
     enabled: enabledRaw === "1" || enabledRaw === "true" || enabledRaw === "yes",

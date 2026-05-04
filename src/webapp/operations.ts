@@ -17,6 +17,7 @@ import {
 import { transitionMeetingRequestStatus } from "../domain/meeting-request-status";
 import { patchMeetingSettings } from "../domain/app-settings";
 import {
+  CalendarEventSyncProvider,
   CalendarEventCreateResult,
   createGoogleCalendarEventSyncProvider
 } from "../integrations/google-calendar";
@@ -49,7 +50,19 @@ export class WebAppOperationError extends Error {
   }
 }
 
-const calendarSyncProvider = createGoogleCalendarEventSyncProvider();
+let calendarSyncProviderOverride: CalendarEventSyncProvider | null | undefined;
+
+function getCalendarSyncProvider(): CalendarEventSyncProvider | null {
+  if (calendarSyncProviderOverride !== undefined) {
+    return calendarSyncProviderOverride;
+  }
+
+  return createGoogleCalendarEventSyncProvider();
+}
+
+export function setWebAppCalendarSyncProvider(provider: CalendarEventSyncProvider | null | undefined): void {
+  calendarSyncProviderOverride = provider;
+}
 
 function formatDateRangeMoscow(startAt: Date, endAt: Date): string {
   const date = new Intl.DateTimeFormat("ru-RU", {
@@ -159,6 +172,7 @@ async function createCalendarEvent(input: {
   firstName: string | null;
   lastName: string | null;
 }): Promise<CalendarEventCreateResult> {
+  const calendarSyncProvider = getCalendarSyncProvider();
   if (!calendarSyncProvider) {
     throw new WebAppOperationError("CALENDAR_PROVIDER_MISSING", "Calendar provider is not configured");
   }
@@ -372,6 +386,7 @@ export async function cancelMeetingRequest(input: {
   }
 
   if (request.calendarEvent?.googleCalendarEventId) {
+    const calendarSyncProvider = getCalendarSyncProvider();
     if (!calendarSyncProvider) {
       throw new WebAppOperationError("CALENDAR_PROVIDER_MISSING", "Calendar provider is not configured");
     }
@@ -472,6 +487,7 @@ export async function rescheduleMeetingRequest(input: {
     throw new WebAppOperationError("SLOT_NOT_AVAILABLE", "Selected slot is not available");
   }
 
+  const calendarSyncProvider = getCalendarSyncProvider();
   if (!calendarSyncProvider) {
     throw new WebAppOperationError("CALENDAR_PROVIDER_MISSING", "Calendar provider is not configured");
   }

@@ -140,11 +140,6 @@ async function run() {
         details: { stage: "5", mode: "verify_script_start" }
     });
     const botToken = process.env.TELEGRAM_BOT_TOKEN ?? "123456:stage5verify";
-    const availabilityProvider = {
-        async getBusyIntervals() {
-            return [];
-        }
-    };
     let eventSeq = 0;
     const calendarEventSyncProvider = {
         async createEvent(input) {
@@ -170,7 +165,6 @@ async function run() {
         botToken,
         webhookSecretToken: process.env.TELEGRAM_WEBHOOK_SECRET ?? null,
         dryRun: true,
-        availabilityProvider,
         calendarEventSyncProvider,
         adminTelegramId: ADMIN_TELEGRAM_ID
     });

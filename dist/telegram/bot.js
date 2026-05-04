@@ -15,15 +15,8 @@ const env_1 = require("../env");
 const google_calendar_1 = require("../integrations/google-calendar");
 const logger_1 = require("../logger");
 const DURATION_OPTIONS = [15, 30, 45, 60, 90];
-const MOSCOW_UTC_OFFSET_MINUTES = 180;
 const DRAFT_TTL_HOURS = 24;
 const PROCESSED_UPDATE_TTL_MS = 10 * 60 * 1000;
-const ACTIVE_SLOT_LOCK_STATUSES = [
-    client_1.MeetingRequestStatus.PENDING_APPROVAL,
-    client_1.MeetingRequestStatus.APPROVED,
-    client_1.MeetingRequestStatus.RESCHEDULE_REQUESTED,
-    client_1.MeetingRequestStatus.RESCHEDULED
-];
 const EMAIL_SCHEMA = zod_1.z.string().email();
 const ACTION = {
     MENU_NEW: "menu:new",
@@ -59,7 +52,6 @@ const ANTI_SPAM_SUBMIT_MS = 6000;
 const ANTI_SPAM_ACTION_MS = 2500;
 let runtimeCache = null;
 let runtimeCacheToken = null;
-let runtimeAvailabilityProvider = (0, google_calendar_1.createGoogleCalendarAvailabilityProvider)();
 let runtimeCalendarEventSyncProvider = (0, google_calendar_1.createGoogleCalendarEventSyncProvider)();
 let runtimeAdminTelegramId = (0, env_1.getApprovalConfig)().adminTelegramId;
 const pendingRejectionCommentByAdmin = new Map();
@@ -210,25 +202,6 @@ function parseDraftPayload(value) {
 function nowPlusHours(hours) {
     return new Date(Date.now() + hours * 60 * 60 * 1000);
 }
-function toMoscowDate(date) {
-    return new Date(date.getTime() + MOSCOW_UTC_OFFSET_MINUTES * 60 * 1000);
-}
-function fromMoscowPartsToUtcDate(year, month, day, hour, minute) {
-    const utcMs = Date.UTC(year, month - 1, day, hour, minute) - MOSCOW_UTC_OFFSET_MINUTES * 60 * 1000;
-    return new Date(utcMs);
-}
-function floorToMinute(date) {
-    return new Date(Math.floor(date.getTime() / 60000) * 60000);
-}
-function roundUpToThirtyMinutes(date) {
-    const rounded = floorToMinute(date);
-    const minute = rounded.getUTCMinutes();
-    const remainder = minute % 30;
-    if (remainder === 0) {
-        return rounded;
-    }
-    return new Date(rounded.getTime() + (30 - remainder) * 60000);
-}
 function formatDateTimeMoscow(date) {
     return new Intl.DateTimeFormat("ru-RU", {
         timeZone: "Europe/Moscow",
@@ -332,125 +305,6 @@ function formatReview(payload) {
         lines.push(`• Место: ${payload.location ?? "-"}`);
     }
     return lines.join("\n");
-}
-function buildCandidateSlots(durationMinutes, settings) {
-    const slots = [];
-    const minStart = roundUpToThirtyMinutes(new Date(Date.now() + settings.slotMinLeadHours * 60 * 60 * 1000));
-    const nowMoscow = toMoscowDate(new Date());
-    const baseYear = nowMoscow.getUTCFullYear();
-    const baseMonth = nowMoscow.getUTCMonth() + 1;
-    const baseDay = nowMoscow.getUTCDate();
-    for (let dayOffset = 0; dayOffset <= settings.slotHorizonDays; dayOffset += 1) {
-        const dayStartUtc = fromMoscowPartsToUtcDate(baseYear, baseMonth, baseDay + dayOffset, 0, 0);
-        const dayMoscow = toMoscowDate(dayStartUtc);
-        const dayOfWeek = dayMoscow.getUTCDay();
-        if (dayOfWeek === 0 || dayOfWeek === 6) {
-            continue;
-        }
-        for (let hour = settings.workdayStartHour; hour < settings.workdayEndHour; hour += 1) {
-            for (let minute = 0; minute < 60; minute += 30) {
-                const startAt = fromMoscowPartsToUtcDate(dayMoscow.getUTCFullYear(), dayMoscow.getUTCMonth() + 1, dayMoscow.getUTCDate(), hour, minute);
-                if (startAt.getTime() < minStart.getTime()) {
-                    continue;
-                }
-                const endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
-                const endMoscow = toMoscowDate(endAt);
-                if (endMoscow.getUTCFullYear() !== dayMoscow.getUTCFullYear() ||
-                    endMoscow.getUTCMonth() !== dayMoscow.getUTCMonth() ||
-                    endMoscow.getUTCDate() !== dayMoscow.getUTCDate()) {
-                    continue;
-                }
-                const endTotalMinutes = endMoscow.getUTCHours() * 60 + endMoscow.getUTCMinutes();
-                if (endTotalMinutes > settings.workdayEndHour * 60) {
-                    continue;
-                }
-                slots.push({
-                    startAt,
-                    endAt,
-                    label: formatDateTimeMoscow(startAt)
-                });
-            }
-        }
-    }
-    return slots;
-}
-function overlaps(aStart, aEnd, bStart, bEnd) {
-    return aStart.getTime() < bEnd.getTime() && bStart.getTime() < aEnd.getTime();
-}
-function withSlotBuffer(startAt, endAt, settings) {
-    return {
-        startAt: new Date(startAt.getTime() - settings.slotBufferMinutes * 60 * 1000),
-        endAt: new Date(endAt.getTime() + settings.slotBufferMinutes * 60 * 1000)
-    };
-}
-function isSlotAvailable(slot, busyIntervals, settings) {
-    const bufferedSlot = withSlotBuffer(slot.startAt, slot.endAt, settings);
-    return !busyIntervals.some((busy) => overlaps(bufferedSlot.startAt, bufferedSlot.endAt, busy.startAt, busy.endAt));
-}
-async function getLocalBusyIntervals(timeMin, timeMax, excludeMeetingRequestId) {
-    const requests = await db_1.prisma.meetingRequest.findMany({
-        where: {
-            status: { in: ACTIVE_SLOT_LOCK_STATUSES },
-            ...(excludeMeetingRequestId
-                ? {
-                    id: {
-                        not: excludeMeetingRequestId
-                    }
-                }
-                : {}),
-            startAt: { lt: timeMax },
-            endAt: { gt: timeMin }
-        },
-        select: {
-            startAt: true,
-            endAt: true
-        }
-    });
-    return requests.map((request) => ({
-        startAt: request.startAt,
-        endAt: request.endAt
-    }));
-}
-async function getBusyIntervalsForRange(timeMin, timeMax, excludeMeetingRequestId) {
-    const localBusyPromise = getLocalBusyIntervals(timeMin, timeMax, excludeMeetingRequestId);
-    const calendarBusyPromise = runtimeAvailabilityProvider
-        ? runtimeAvailabilityProvider.getBusyIntervals({ timeMin, timeMax })
-        : Promise.resolve([]);
-    const [calendarBusy, localBusy] = await Promise.all([calendarBusyPromise, localBusyPromise]);
-    return [...calendarBusy, ...localBusy];
-}
-async function buildAvailableSlots(durationMinutes, excludeMeetingRequestId) {
-    const settings = await getCachedMeetingSettings();
-    const candidates = buildCandidateSlots(durationMinutes, settings);
-    if (candidates.length === 0) {
-        return [];
-    }
-    const firstCandidate = candidates[0];
-    const lastCandidate = candidates[candidates.length - 1];
-    const rangeStart = new Date(firstCandidate.startAt.getTime() - settings.slotBufferMinutes * 60 * 1000);
-    const rangeEnd = new Date(lastCandidate.endAt.getTime() + settings.slotBufferMinutes * 60 * 1000);
-    const busyIntervals = await getBusyIntervalsForRange(rangeStart, rangeEnd, excludeMeetingRequestId);
-    const available = candidates
-        .filter((slot) => isSlotAvailable(slot, busyIntervals, settings))
-        .slice(0, settings.slotLimit);
-    (0, logger_1.logEvent)({
-        operation: "slots_built",
-        status: "ok",
-        details: {
-            duration_minutes: durationMinutes,
-            candidates_count: candidates.length,
-            busy_count: busyIntervals.length,
-            slots_count: available.length,
-            slot_limit: settings.slotLimit
-        }
-    });
-    return available;
-}
-async function ensureSlotStillAvailable(startAt, endAt, excludeMeetingRequestId) {
-    const settings = await getCachedMeetingSettings();
-    const bufferedSlot = withSlotBuffer(startAt, endAt, settings);
-    const busyIntervals = await getBusyIntervalsForRange(bufferedSlot.startAt, bufferedSlot.endAt, excludeMeetingRequestId);
-    return !busyIntervals.some((busy) => overlaps(bufferedSlot.startAt, bufferedSlot.endAt, busy.startAt, busy.endAt));
 }
 async function upsertUserFromContext(ctx) {
     if (!ctx.from) {
@@ -2085,10 +1939,6 @@ function configureDryRunApi(bot) {
     });
 }
 function createTelegramBotRuntime(options) {
-    runtimeAvailabilityProvider =
-        options.availabilityProvider === undefined
-            ? (0, google_calendar_1.createGoogleCalendarAvailabilityProvider)()
-            : options.availabilityProvider;
     runtimeCalendarEventSyncProvider =
         options.calendarEventSyncProvider === undefined
             ? (0, google_calendar_1.createGoogleCalendarEventSyncProvider)()

@@ -11,7 +11,7 @@ function escapeHtml(value: string): string {
 
 export function renderMiniAppHtml(): string {
   const config = getMiniAppConfig();
-  const appTitle = "Запись в календарь";
+  const appTitle = "NexaMeet";
   const onboardingEnabled = config.onboardingEnabled ? "true" : "false";
 
   return `<!doctype html>

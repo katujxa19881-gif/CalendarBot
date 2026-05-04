@@ -1,4 +1,4 @@
-# Проект реализации — Mini App CalendarBot
+# Проект реализации — Mini App NexaMeet
 
 ## 1. Паспорт проекта
 1. Проект: Telegram Mini App для CalendarBot.
@@ -9,11 +9,11 @@
 
 ## 2. Контрольный чеклист этапов
 1. [x] M1 Контракты API + feature flags.
-2. [ ] M2 Рефактор в общий service-layer без изменения поведения бота.
+2. [x] M2 Рефактор в общий service-layer без изменения поведения бота.
 3. [x] M3 WebApp auth + RBAC middleware.
-4. [ ] M4 User API + User UI (backend в работе, UI не начат).
-5. [ ] M5 Admin API + Admin UI (backend в работе, UI не начат).
-6. [ ] M6 Интеграционные тесты bot/webapp.
+4. [x] M4 User API + User UI.
+5. [x] M5 Admin API + Admin UI.
+6. [x] M6 Интеграционные тесты bot/webapp.
 7. [ ] M7 Rollout и стабилизация.
 
 ## 3. Артефакты проекта
@@ -143,6 +143,19 @@
 9. Какие логи проверены: `http_request_received`, `mini_app_auth_success`, `meeting_request_submitted`.
 10. Какие файлы созданы или изменены: `src/webapp/ui.ts`, `dist/*` (сборка), серверный деплой `/opt/calendarbot`.
 11. Какие риски или вопросы остались: финальный UX-polish админских сценариев (перенос/редактирование времени) можно улучшить отдельным UI-компонентом вместо prompt.
+
+### Запись 2026-05-04 (Завершение M2 + M6, бренд NexaMeet)
+1. Дата: 2026-05-04
+2. Этап: M2 + M6
+3. Статус: Завершен
+4. Что сделано: завершена зачистка legacy slot-кода в `bot.ts`, verify-скрипты приведены к актуальному runtime API, добавлен интеграционный `stage10:verify` для проверки bot/webapp сценариев на одной БД, внедрено название `NexaMeet`.
+5. Как сделано: обновлены `src/telegram/bot.ts`, `src/scripts/stage4-verify.ts`, `src/scripts/stage5-verify.ts`, `src/scripts/stage7-verify.ts`, добавлен `src/scripts/stage10-verify.ts`, добавлен npm-скрипт `stage10:verify`; в `src/webapp/operations.ts` добавлен runtime-resolver календарного провайдера для безопасной тестовой подмены.
+6. Зачем сделано: формально закрыть переиспользование логики между каналами и получить автоматическую гарантию консистентности bot/webapp перед rollout.
+7. Что проверено мной: `npm run build`, `npm run stage4:verify`, `npm run stage5:verify`, `npm run stage7:verify`, `npm run stage9:verify`, `npm run stage10:verify`.
+8. Что проверила пользователь: подтвердила работоспособность mini app и согласовала переход к следующему этапу.
+9. Какие логи проверены: `meeting_request_submitted`, `approval_confirmed`, `reschedule_completed`, `cancellation_completed`, `slots_built`, `mini_app_auth_success`.
+10. Какие файлы созданы или изменены: `src/telegram/bot.ts`, `src/webapp/operations.ts`, `src/scripts/stage4-verify.ts`, `src/scripts/stage5-verify.ts`, `src/scripts/stage7-verify.ts`, `src/scripts/stage10-verify.ts`, `src/env.ts`, `.env.example`, `package.json`, `Проект реализации mini app.md`, `Этапы разработки.md`.
+11. Какие риски или вопросы остались: для `M7 Rollout` остается финальный production-deploy и пользовательский smoke на телефоне после выкладки.
 
 ## 7. Шаблон записи для следующих шагов
 1. Дата:
