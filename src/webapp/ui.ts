@@ -170,11 +170,61 @@ export function renderMiniAppHtml(): string {
       color: #c8deef;
       line-height: 1.35;
     }
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 10, 17, .72);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 50;
+    }
+    .modal {
+      width: min(680px, 100%);
+      max-height: 90vh;
+      overflow: auto;
+      background: #0a1424;
+      border: 1px solid #1d4767;
+      border-radius: 14px;
+      padding: 12px;
+      box-shadow: 0 16px 40px rgba(0,0,0,.45);
+    }
+    .modal h3 {
+      margin: 0 0 10px;
+      color: #9ee8ff;
+      font-size: 16px;
+    }
+    .template-grid {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .template-btn {
+      text-align: left;
+      white-space: normal;
+      line-height: 1.3;
+      font-size: 13px;
+      padding: 10px;
+      border-color: #255173;
+    }
+    .template-btn.active {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 1px rgba(0,229,255,.3) inset;
+      background: #11253a;
+    }
+    .modal-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
     .slot-date { color: #cce8ff; }
     .slot-time { color: #7af4ff; font-weight: 700; }
   </style>
 </head>
 <body>
+  <!-- miniapp-build: modal-v2 -->
   <div class="wrap">
     <div class="card">
       <h1>${escapeHtml(appTitle)}</h1>
@@ -266,6 +316,20 @@ export function renderMiniAppHtml(): string {
     </div>
   </div>
 
+  <div id="replyModalBackdrop" class="modal-backdrop hidden">
+    <div class="modal">
+      <h3 id="replyModalTitle">Шаблон ответа</h3>
+      <div id="replyTemplateList" class="template-grid"></div>
+      <label>Текст ответа
+        <textarea id="replyModalText"></textarea>
+      </label>
+      <div class="modal-actions">
+        <button id="replyModalCancel">Отмена</button>
+        <button id="replyModalSubmit" class="lime">Отправить</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     (() => {
       const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
@@ -298,11 +362,20 @@ export function renderMiniAppHtml(): string {
         sHorizon: document.getElementById('sHorizon'),
         sLead: document.getElementById('sLead')
       };
+      const modalEls = {
+        backdrop: document.getElementById('replyModalBackdrop'),
+        title: document.getElementById('replyModalTitle'),
+        templateList: document.getElementById('replyTemplateList'),
+        text: document.getElementById('replyModalText'),
+        cancel: document.getElementById('replyModalCancel'),
+        submit: document.getElementById('replyModalSubmit')
+      };
 
       let token = null;
       let role = 'user';
       let slotsCache = [];
       let selectedSlotIndex = null;
+      let replyModalResolver = null;
 
       const statusLabels = {
         NEW: 'Новая',
@@ -396,32 +469,47 @@ export function renderMiniAppHtml(): string {
 
       function chooseAdminReply(action, request) {
         const options = adminReplyTemplates[action] || [];
-        if (!options.length) {
-          return { cancelled: false, comment: null };
-        }
+        const actionTitles = {
+          approve: 'Ответ при подтверждении',
+          reject: 'Ответ при отклонении',
+          cancel: 'Ответ при отмене',
+          reschedule: 'Ответ при переносе'
+        };
 
-        const menu = ['0 — Без шаблона'];
-        options.forEach((text, idx) => {
-          menu.push(String(idx + 1) + ' — ' + applyTemplateVars(text, request));
+        return new Promise((resolve) => {
+          replyModalResolver = resolve;
+          modalEls.title.textContent = actionTitles[action] || 'Шаблон ответа';
+          modalEls.templateList.innerHTML = '';
+          modalEls.text.value = '';
+
+          const noneBtn = document.createElement('button');
+          noneBtn.type = 'button';
+          noneBtn.className = 'template-btn active';
+          noneBtn.textContent = 'Без шаблона';
+          noneBtn.onclick = () => {
+            modalEls.templateList.querySelectorAll('.template-btn').forEach((el) => el.classList.remove('active'));
+            noneBtn.classList.add('active');
+            modalEls.text.value = '';
+          };
+          modalEls.templateList.appendChild(noneBtn);
+
+          options.forEach((template) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'template-btn';
+            const rendered = applyTemplateVars(template, request);
+            btn.textContent = rendered;
+            btn.onclick = () => {
+              modalEls.templateList.querySelectorAll('.template-btn').forEach((el) => el.classList.remove('active'));
+              btn.classList.add('active');
+              modalEls.text.value = rendered;
+            };
+            modalEls.templateList.appendChild(btn);
+          });
+
+          modalEls.backdrop.classList.remove('hidden');
+          modalEls.text.focus();
         });
-        const selectedRaw = prompt('Выбери шаблон ответа:\\n' + menu.join('\\n'), '1');
-        if (selectedRaw === null) {
-          return { cancelled: true, comment: null };
-        }
-
-        const selected = Number(selectedRaw);
-        let initial = '';
-        if (Number.isFinite(selected) && selected > 0 && selected <= options.length) {
-          initial = applyTemplateVars(options[selected - 1], request);
-        }
-
-        const edited = prompt('Проверь и при необходимости отредактируй текст:', initial);
-        if (edited === null) {
-          return { cancelled: true, comment: null };
-        }
-
-        const trimmed = edited.trim();
-        return { cancelled: false, comment: trimmed ? trimmed : null };
       }
 
       function switchTab(tab) {
@@ -506,7 +594,7 @@ export function renderMiniAppHtml(): string {
               approve.textContent = 'Подтвердить';
               approve.className = 'lime';
               approve.onclick = async () => {
-                const reply = chooseAdminReply('approve', r);
+                const reply = await chooseAdminReply('approve', r);
                 if (reply.cancelled) return;
                 try {
                   await api('/api/webapp/admin/requests/' + r.id + '/approve', {
@@ -527,7 +615,7 @@ export function renderMiniAppHtml(): string {
               reject.textContent = 'Отклонить';
               reject.className = 'danger';
               reject.onclick = async () => {
-                const reply = chooseAdminReply('reject', r);
+                const reply = await chooseAdminReply('reject', r);
                 if (reply.cancelled) return;
                 try {
                   await api('/api/webapp/admin/requests/' + r.id + '/reject', {
@@ -547,7 +635,7 @@ export function renderMiniAppHtml(): string {
               const cancel = document.createElement('button');
               cancel.textContent = 'Отменить';
               cancel.onclick = async () => {
-                const reply = chooseAdminReply('cancel', r);
+                const reply = await chooseAdminReply('cancel', r);
                 if (reply.cancelled) return;
                 try {
                   await api('/api/webapp/admin/requests/' + r.id + '/cancel', {
@@ -570,7 +658,7 @@ export function renderMiniAppHtml(): string {
                 const start = prompt('Новый start_at ISO', r.start_at);
                 const end = prompt('Новый end_at ISO', r.end_at);
                 if (!start || !end) return;
-                const reply = chooseAdminReply('reschedule', r);
+                const reply = await chooseAdminReply('reschedule', r);
                 if (reply.cancelled) return;
                 try {
                   await api('/api/webapp/admin/requests/' + r.id + '/reschedule', {
@@ -797,6 +885,24 @@ export function renderMiniAppHtml(): string {
       els.btnAddHome.addEventListener('click', () => {
         if (tg && typeof tg.addToHomeScreen === 'function') {
           try { tg.addToHomeScreen(); } catch {}
+        }
+      });
+
+      function closeReplyModal(payload) {
+        modalEls.backdrop.classList.add('hidden');
+        const resolver = replyModalResolver;
+        replyModalResolver = null;
+        if (resolver) resolver(payload);
+      }
+
+      modalEls.cancel.addEventListener('click', () => closeReplyModal({ cancelled: true, comment: null }));
+      modalEls.submit.addEventListener('click', () => {
+        const text = modalEls.text.value.trim();
+        closeReplyModal({ cancelled: false, comment: text ? text : null });
+      });
+      modalEls.backdrop.addEventListener('click', (event) => {
+        if (event.target === modalEls.backdrop) {
+          closeReplyModal({ cancelled: true, comment: null });
         }
       });
 

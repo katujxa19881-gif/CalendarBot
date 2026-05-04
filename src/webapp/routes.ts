@@ -3,6 +3,7 @@ import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { prisma } from "../db";
 import { getMeetingSettings } from "../domain/app-settings";
+import { MeetingRequestStatusTransitionError } from "../domain/meeting-request-status";
 import { getMiniAppConfig } from "../env";
 import { logEvent } from "../logger";
 import { ensureWizardStateForUser } from "../telegram/bot";
@@ -154,6 +155,14 @@ function replyOperationError(reply: FastifyReply, error: unknown): void {
     reply.code(statusCode).send({
       ok: false,
       error: error.code
+    });
+    return;
+  }
+
+  if (error instanceof MeetingRequestStatusTransitionError) {
+    reply.code(409).send({
+      ok: false,
+      error: error.code === "REQUEST_NOT_FOUND" ? "REQUEST_NOT_FOUND" : "REQUEST_STATUS_INVALID"
     });
     return;
   }
