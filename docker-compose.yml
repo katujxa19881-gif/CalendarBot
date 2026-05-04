@@ -13,7 +13,7 @@ services:
       PORT: 3000
       SQLITE_PATH: /app/data/app.db
       DATABASE_URL: file:/app/data/app.db
-      TELEGRAM_TRANSPORT: polling
+      TELEGRAM_TRANSPORT: ${TELEGRAM_TRANSPORT:-polling}
     volumes:
       - ./data:/app/data
     ports:
