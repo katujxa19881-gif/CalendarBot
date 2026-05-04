@@ -14,7 +14,7 @@
 4. [x] M4 User API + User UI.
 5. [x] M5 Admin API + Admin UI.
 6. [x] M6 Интеграционные тесты bot/webapp.
-7. [ ] M7 Rollout и стабилизация.
+7. [ ] M7 Rollout и стабилизация. (в работе)
 
 ## 3. Артефакты проекта
 1. [Техническое задание mini app](/Users/katerina/Desktop/Codex%20рабочие%20файлы/Согласование%20встреч%20Google/Техническое%20задание%20mini%20app.md)
@@ -192,3 +192,12 @@
 3. редактируемые шаблоны ответов,
 4. PIN-защита админ-панели поверх admin-сессии.
 3. Проверки: `npm run build`, `npm run stage9:verify`, `npm run stage10:verify`.
+
+## Обновление 2026-05-04 (старт M7)
+1. M7 переведен в статус `В работе`.
+2. Подготовлен безопасный production rollout-порядок в `Развертывание на сервере.md`:
+1. pre-deploy проверки,
+2. порядок выкладки,
+3. post-deploy smoke (user/admin + bot regression),
+4. rollback через feature flags.
+3. Следующий шаг: выполнить rollout на сервере и пройти smoke-check в Telegram.
