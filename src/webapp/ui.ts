@@ -152,24 +152,6 @@ export function renderMiniAppHtml(): string {
       background: linear-gradient(135deg, rgba(0,229,255,.10), rgba(163,255,18,.08));
       margin-top: 10px;
     }
-    .guide {
-      margin-top: 10px;
-      border: 1px solid #1b344a;
-      border-radius: 12px;
-      padding: 10px;
-      background: rgba(8, 18, 30, .75);
-    }
-    .guide h3 {
-      margin: 0 0 6px;
-      font-size: 14px;
-      color: #a5ecff;
-    }
-    .guide p {
-      margin: 0 0 6px;
-      font-size: 13px;
-      color: #c8deef;
-      line-height: 1.35;
-    }
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -376,6 +358,8 @@ export function renderMiniAppHtml(): string {
       let slotsCache = [];
       let selectedSlotIndex = null;
       let replyModalResolver = null;
+      let adminPin = null;
+      let adminUnlocked = false;
 
       const statusLabels = {
         NEW: 'Новая',
@@ -448,6 +432,9 @@ export function renderMiniAppHtml(): string {
           headers['Content-Type'] = 'application/json';
         }
         if (token) headers['Authorization'] = 'Bearer ' + token;
+        if (adminPin && url.includes('/api/webapp/admin/')) {
+          headers['x-admin-pin'] = adminPin;
+        }
         const response = await fetch(url, Object.assign({}, options, { headers }));
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data.ok === false) {
@@ -519,6 +506,32 @@ export function renderMiniAppHtml(): string {
           if (!el) return;
           el.classList.toggle('hidden', t !== tab);
         });
+      }
+
+      async function ensureAdminUnlocked() {
+        if (role !== 'admin') return false;
+        if (adminUnlocked) return true;
+
+        const enteredPin = prompt('Введите PIN-код для доступа к админ-панели:', '');
+        if (enteredPin === null) return false;
+        const pin = enteredPin.trim();
+        if (!pin) {
+          alert('PIN не введен');
+          return false;
+        }
+
+        try {
+          await api('/api/webapp/admin/pin/verify', {
+            method: 'POST',
+            body: JSON.stringify({ pin })
+          });
+          adminPin = pin;
+          adminUnlocked = true;
+          return true;
+        } catch (error) {
+          showActionError(error);
+          return false;
+        }
       }
 
       function renderRequests(container, requests, mode) {
@@ -744,8 +757,7 @@ export function renderMiniAppHtml(): string {
         els.profileBlock.innerHTML = [
           '<div><strong>' + (user.first_name || '-') + ' ' + (user.last_name || '') + '</strong></div>',
           '<div class="muted">@' + (user.username || '-') + ' / роль: ' + (role === 'admin' ? 'админ' : 'пользователь') + '</div>',
-          '<div class="hero"><strong>Запись на консультацию к Екатерине</strong><div class="small muted">Здесь можно быстро выбрать удобное время и записаться на консультацию по AI-вайбкодингу и финансовому планированию с ИИ. Создайте заявку, выберите слот и отслеживайте статус в одном месте.</div></div>',
-          '<div class="guide"><h3>Гид по mini app</h3><p>1) Во вкладке «Новая заявка» выбери слот, заполни тему и отправь заявку.</p><p>2) Во вкладке «Мои заявки» отслеживай статусы и при необходимости отменяй или переноси встречу.</p><p>3) Во вкладке «Админ» заявки разложены по статусам: подтверждай, отклоняй, отменяй или переноси с шаблонным ответом.</p></div>'
+          '<div class="hero"><strong>Запись на консультацию к Екатерине</strong><div class="small muted">Здесь можно быстро выбрать удобное время и записаться на консультацию по AI-вайбкодингу и финансовому планированию с ИИ. Создайте заявку, выберите слот и отслеживайте статус в одном месте.</div></div>'
         ].join('');
 
         if (role === 'admin') {
@@ -762,15 +774,21 @@ export function renderMiniAppHtml(): string {
         els.fTopic.value = '';
 
         await loadMyRequests();
-        await loadAdminRequests();
-        await loadAdminSettings();
 
         els.appRoot.classList.remove('hidden');
         setStatus(browserDevMode ? 'Подключено (локальный режим)' : 'Подключено', 'ok');
       }
 
       document.querySelectorAll('.tabs button[data-tab]').forEach((btn) => {
-        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+        btn.addEventListener('click', async () => {
+          if (btn.dataset.tab === 'admin') {
+            const unlocked = await ensureAdminUnlocked();
+            if (!unlocked) return;
+            await loadAdminRequests();
+            await loadAdminSettings();
+          }
+          switchTab(btn.dataset.tab);
+        });
       });
 
       els.fFormat.addEventListener('change', () => {

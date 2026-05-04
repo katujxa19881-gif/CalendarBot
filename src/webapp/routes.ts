@@ -67,6 +67,9 @@ const adminRescheduleBodySchema = z.object({
   end_at: z.string().datetime(),
   comment: z.string().trim().max(1000).nullable().optional()
 });
+const adminPinVerifyBodySchema = z.object({
+  pin: z.string().trim().min(1).max(64)
+});
 const patchSettingsBodySchema = z
   .object({
     workday_start_hour: z.number().int().optional(),
@@ -204,6 +207,35 @@ async function requireAdminSession(
     reply.code(403).send({
       ok: false,
       error: "ADMIN_ACCESS_DENIED"
+    });
+    return null;
+  }
+
+  return session;
+}
+
+function hasValidAdminPin(request: FastifyRequest): boolean {
+  const { adminPin } = getMiniAppConfig();
+  if (!adminPin) {
+    return true;
+  }
+  const headerPin = String(request.headers["x-admin-pin"] ?? "").trim();
+  return headerPin.length > 0 && headerPin === adminPin;
+}
+
+async function requireAdminAccess(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<SessionContext | null> {
+  const session = await requireAdminSession(request, reply);
+  if (!session) {
+    return null;
+  }
+
+  if (!hasValidAdminPin(request)) {
+    reply.code(403).send({
+      ok: false,
+      error: "ADMIN_PIN_INVALID"
     });
     return null;
   }
@@ -793,7 +825,7 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
       return;
     }
 
-    const session = await requireAdminSession(request, reply);
+    const session = await requireAdminAccess(request, reply);
     if (!session) {
       return;
     }
@@ -840,7 +872,7 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
   });
 
   app.post("/api/webapp/admin/requests/:id/approve", async (request: FastifyRequest, reply: FastifyReply) => {
-    const session = await requireAdminSession(request, reply);
+    const session = await requireAdminAccess(request, reply);
     if (!session) {
       return;
     }
@@ -884,7 +916,7 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
   });
 
   app.post("/api/webapp/admin/requests/:id/reject", async (request: FastifyRequest, reply: FastifyReply) => {
-    const session = await requireAdminSession(request, reply);
+    const session = await requireAdminAccess(request, reply);
     if (!session) {
       return;
     }
@@ -930,7 +962,7 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
   });
 
   app.post("/api/webapp/admin/requests/:id/cancel", async (request: FastifyRequest, reply: FastifyReply) => {
-    const session = await requireAdminSession(request, reply);
+    const session = await requireAdminAccess(request, reply);
     if (!session) {
       return;
     }
@@ -975,7 +1007,7 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
   });
 
   app.post("/api/webapp/admin/requests/:id/reschedule", async (request: FastifyRequest, reply: FastifyReply) => {
-    const session = await requireAdminSession(request, reply);
+    const session = await requireAdminAccess(request, reply);
     if (!session) {
       return;
     }
@@ -1038,7 +1070,7 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
       return;
     }
 
-    const session = await requireAdminSession(request, reply);
+    const session = await requireAdminAccess(request, reply);
     if (!session) {
       return;
     }
@@ -1064,7 +1096,7 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
       return;
     }
 
-    const session = await requireAdminSession(request, reply);
+    const session = await requireAdminAccess(request, reply);
     if (!session) {
       return;
     }
@@ -1105,5 +1137,37 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
     } catch (error) {
       replyOperationError(reply, error);
     }
+  });
+
+  app.post("/api/webapp/admin/pin/verify", async (request: FastifyRequest, reply: FastifyReply) => {
+    const miniAppConfig = getMiniAppConfig();
+    if (!miniAppConfig.enabled || !miniAppConfig.adminEnabled) {
+      reply.code(404).send({ ok: false, error: "MINI_APP_DISABLED" });
+      return;
+    }
+
+    const session = await requireAdminSession(request, reply);
+    if (!session) {
+      return;
+    }
+
+    const parsedBody = adminPinVerifyBodySchema.safeParse(request.body);
+    if (!parsedBody.success) {
+      reply.code(400).send({
+        ok: false,
+        error: "ADMIN_PIN_PAYLOAD_INVALID"
+      });
+      return;
+    }
+
+    if (!miniAppConfig.adminPin || parsedBody.data.pin === miniAppConfig.adminPin) {
+      reply.code(200).send({ ok: true });
+      return;
+    }
+
+    reply.code(403).send({
+      ok: false,
+      error: "ADMIN_PIN_INVALID"
+    });
   });
 }

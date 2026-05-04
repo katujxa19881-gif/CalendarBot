@@ -30,6 +30,7 @@ async function main(): Promise<void> {
   process.env.TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "123456:stage9-test-token";
   process.env.MINI_APP_SESSION_SECRET = process.env.MINI_APP_SESSION_SECRET ?? "stage9-test-session-secret";
   process.env.ADMIN_TELEGRAM_ID = process.env.ADMIN_TELEGRAM_ID ?? "7001001";
+  process.env.MINI_APP_ADMIN_PIN = process.env.MINI_APP_ADMIN_PIN ?? "1234";
   process.env.GOOGLE_CLIENT_ID = "";
   process.env.GOOGLE_CLIENT_SECRET = "";
   process.env.GOOGLE_REFRESH_TOKEN = "";
@@ -154,7 +155,8 @@ async function main(): Promise<void> {
       method: "GET",
       url: "/api/webapp/admin/requests?limit=5",
       headers: {
-        authorization: `Bearer ${authPayload.token}`
+        authorization: `Bearer ${authPayload.token}`,
+        "x-admin-pin": process.env.MINI_APP_ADMIN_PIN
       }
     });
     assert.equal(adminListResponse.statusCode, 200, `admin list status ${adminListResponse.statusCode}`);
@@ -169,7 +171,8 @@ async function main(): Promise<void> {
       method: "GET",
       url: "/api/webapp/admin/settings",
       headers: {
-        authorization: `Bearer ${authPayload.token}`
+        authorization: `Bearer ${authPayload.token}`,
+        "x-admin-pin": process.env.MINI_APP_ADMIN_PIN
       }
     });
     assert.equal(settingsResponse.statusCode, 200, `admin settings status ${settingsResponse.statusCode}`);

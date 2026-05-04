@@ -78,6 +78,7 @@ function getBackgroundJobsConfig() {
 function getMiniAppConfig() {
     const enabledRaw = (process.env.MINI_APP_ENABLED ?? "false").trim().toLowerCase();
     const adminEnabledRaw = (process.env.MINI_APP_ADMIN_ENABLED ?? "false").trim().toLowerCase();
+    const adminPinRaw = (process.env.MINI_APP_ADMIN_PIN ?? "1234").trim();
     const browserAuthEnabledRaw = (process.env.MINI_APP_BROWSER_AUTH_ENABLED ?? "false").trim().toLowerCase();
     const onboardingEnabledRaw = (process.env.MINI_APP_ONBOARDING_ENABLED ?? "true").trim().toLowerCase();
     const authMaxAgeSeconds = Number(process.env.MINI_APP_AUTH_MAX_AGE_SECONDS ?? 86400);
@@ -89,6 +90,7 @@ function getMiniAppConfig() {
     return {
         enabled: enabledRaw === "1" || enabledRaw === "true" || enabledRaw === "yes",
         adminEnabled: adminEnabledRaw === "1" || adminEnabledRaw === "true" || adminEnabledRaw === "yes",
+        adminPin: adminPinRaw || null,
         browserAuthEnabled: browserAuthEnabledRaw === "1" || browserAuthEnabledRaw === "true" || browserAuthEnabledRaw === "yes",
         onboardingEnabled: onboardingEnabledRaw !== "0" && onboardingEnabledRaw !== "false" && onboardingEnabledRaw !== "no",
         authMaxAgeSeconds: Number.isFinite(authMaxAgeSeconds) && authMaxAgeSeconds > 0

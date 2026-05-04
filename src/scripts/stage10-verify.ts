@@ -222,6 +222,7 @@ async function main(): Promise<void> {
   process.env.MINI_APP_ONBOARDING_ENABLED = "true";
   process.env.TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? "123456:stage10-test-token";
   process.env.MINI_APP_SESSION_SECRET = process.env.MINI_APP_SESSION_SECRET ?? "stage10-session-secret";
+  process.env.MINI_APP_ADMIN_PIN = process.env.MINI_APP_ADMIN_PIN ?? "1234";
   process.env.ADMIN_TELEGRAM_ID = ADMIN_TELEGRAM_ID;
   process.env.GOOGLE_CLIENT_ID = "";
   process.env.GOOGLE_CLIENT_SECRET = "";
@@ -275,7 +276,8 @@ async function main(): Promise<void> {
       method: "POST",
       url: `/api/webapp/admin/requests/${requestFromBotId}/approve`,
       headers: {
-        authorization: `Bearer ${adminToken}`
+        authorization: `Bearer ${adminToken}`,
+        "x-admin-pin": process.env.MINI_APP_ADMIN_PIN
       }
     });
     assert.equal(approveByWebApp.statusCode, 200);
@@ -359,7 +361,8 @@ async function main(): Promise<void> {
       method: "POST",
       url: `/api/webapp/admin/requests/${requestFromWebAppId}/reschedule`,
       headers: {
-        authorization: `Bearer ${adminToken}`
+        authorization: `Bearer ${adminToken}`,
+        "x-admin-pin": process.env.MINI_APP_ADMIN_PIN
       },
       payload: {
         start_at: slotsPayload.slots[1].start_at,
