@@ -1,0 +1,12 @@
+-- CreateTable
+CREATE TABLE "AppSettings" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "workdayStartHour" INTEGER NOT NULL DEFAULT 10,
+    "workdayEndHour" INTEGER NOT NULL DEFAULT 18,
+    "slotLimit" INTEGER NOT NULL DEFAULT 8,
+    "slotBufferMinutes" INTEGER NOT NULL DEFAULT 15,
+    "slotMinLeadHours" INTEGER NOT NULL DEFAULT 1,
+    "slotHorizonDays" INTEGER NOT NULL DEFAULT 30,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);

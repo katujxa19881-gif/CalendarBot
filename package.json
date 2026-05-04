@@ -1,0 +1,36 @@
+{
+  "name": "meeting-approval-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "RUST_LOG=debug prisma migrate dev",
+    "prisma:deploy": "RUST_LOG=debug prisma migrate deploy",
+    "google:check": "tsx src/scripts/google-check.ts",
+    "stage2:verify": "tsx src/scripts/stage2-verify.ts",
+    "stage3:verify": "tsx src/scripts/stage3-verify.ts",
+    "stage4:verify": "tsx src/scripts/stage4-verify.ts",
+    "stage5:verify": "tsx src/scripts/stage5-verify.ts",
+    "stage6:verify": "tsx src/scripts/stage6-verify.ts",
+    "stage7:verify": "tsx src/scripts/stage7-verify.ts",
+    "stage8:verify": "tsx src/scripts/stage8-verify.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.0",
+    "dotenv": "^17.4.2",
+    "fastify": "^5.8.5",
+    "googleapis": "^171.4.0",
+    "grammy": "^1.42.0",
+    "zod": "^4.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "prisma": "^6.19.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3"
+  }
+}

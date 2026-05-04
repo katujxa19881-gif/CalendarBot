@@ -1,0 +1,219 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum MeetingFormat {
+  ONLINE
+  OFFLINE
+}
+
+enum MeetingRequestStatus {
+  NEW
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+  RESCHEDULE_REQUESTED
+  RESCHEDULED
+  EXPIRED
+}
+
+enum CalendarEventSyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+  UPDATED
+  CANCELLED
+}
+
+enum DraftStatus {
+  ACTIVE
+  EXPIRED
+  DISCARDED
+}
+
+enum JournalActorRole {
+  USER
+  OWNER
+  MANAGER
+  ADMIN
+  SYSTEM
+}
+
+enum JournalActionType {
+  DRAFT_CREATED
+  DRAFT_RESTORED
+  MEETING_REQUEST_SUBMITTED
+  APPROVAL_CONFIRMED
+  APPROVAL_REJECTED
+  RESCHEDULE_REQUESTED
+  RESCHEDULED
+  CANCELLATION_COMPLETED
+  CALENDAR_EVENT_CREATED
+  CALENDAR_EVENT_UPDATED
+  CALENDAR_EVENT_DELETED
+  EMAIL_SENT
+  EMAIL_FAILED
+  INTEGRATION_ERROR
+  STATUS_CHANGED
+}
+
+enum BackgroundJobType {
+  EMAIL_CONFIRMATION
+  EMAIL_REMINDER
+  APPROVAL_REMINDER
+  RETRY_INTEGRATION
+  TTL_CLEANUP
+}
+
+enum BackgroundJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model ServiceMeta {
+  id        Int      @id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AppSettings {
+  id                 Int      @id
+  workdayStartHour   Int      @default(10)
+  workdayEndHour     Int      @default(18)
+  slotLimit          Int      @default(8)
+  slotBufferMinutes  Int      @default(15)
+  slotMinLeadHours   Int      @default(1)
+  slotHorizonDays    Int      @default(30)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model User {
+  id                       String               @id @default(cuid())
+  telegramId               String               @unique
+  username                 String?
+  firstName                String?
+  lastName                 String?
+  lastUsedEmail            String?
+  personalDataConsentGiven Boolean              @default(false)
+  personalDataConsentAt    DateTime?
+  isBlocked                Boolean              @default(false)
+  blockedReason            String?
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+  meetingRequests          MeetingRequest[]
+  drafts                   MeetingRequestDraft[]
+  actionLogs               ActionLog[]
+
+  @@index([createdAt])
+}
+
+model MeetingRequest {
+  id               String               @id @default(cuid())
+  userId           String
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  durationMinutes  Int
+  format           MeetingFormat
+  startAt          DateTime
+  endAt            DateTime
+  topic            String
+  description      String?
+  location         String?
+  email            String
+  firstName        String?
+  lastName         String?
+  status           MeetingRequestStatus @default(NEW)
+  approverId       String?
+  approverComment  String?
+  submittedAt      DateTime?
+  resolvedAt       DateTime?
+  expiresAt        DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  calendarEvent    CalendarEvent?
+  actionLogs       ActionLog[]
+  backgroundJobs   BackgroundJob[]
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([startAt, endAt])
+}
+
+model MeetingRequestDraft {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  currentStep String
+  payload     Json
+  status      DraftStatus @default(ACTIVE)
+  expiresAt   DateTime
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([userId, expiresAt])
+  @@index([status, expiresAt])
+}
+
+model CalendarEvent {
+  id                    String                  @id @default(cuid())
+  meetingRequestId      String                  @unique
+  meetingRequest        MeetingRequest          @relation(fields: [meetingRequestId], references: [id], onDelete: Cascade)
+  googleCalendarEventId String                  @unique
+  googleCalendarId      String?
+  googleMeetLink        String?
+  syncStatus            CalendarEventSyncStatus @default(PENDING)
+  syncedAt              DateTime?
+  lastErrorCode         String?
+  lastErrorMessage      String?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  @@index([syncStatus, createdAt])
+}
+
+model ActionLog {
+  id               String            @id @default(cuid())
+  meetingRequestId String?
+  meetingRequest   MeetingRequest?   @relation(fields: [meetingRequestId], references: [id], onDelete: SetNull)
+  userId           String?
+  user             User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  actorRole        JournalActorRole
+  actorId          String
+  actionType       JournalActionType
+  details          Json?
+  result           String?
+  createdAt        DateTime          @default(now())
+
+  @@index([meetingRequestId, createdAt])
+  @@index([userId, createdAt])
+  @@index([actionType, createdAt])
+}
+
+model BackgroundJob {
+  id               String              @id @default(cuid())
+  meetingRequestId String?
+  meetingRequest   MeetingRequest?     @relation(fields: [meetingRequestId], references: [id], onDelete: SetNull)
+  jobType          BackgroundJobType
+  status           BackgroundJobStatus @default(PENDING)
+  payload          Json
+  runAt            DateTime
+  attempts         Int                 @default(0)
+  maxAttempts      Int                 @default(5)
+  lockedAt         DateTime?
+  lastErrorCode    String?
+  lastErrorMessage String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([status, runAt])
+  @@index([jobType, runAt])
+}

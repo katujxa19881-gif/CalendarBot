@@ -1,0 +1,1 @@
+{"update_id":999100001,"callback_query":{"id":"cb_stage5_live_test","from":{"id":1091395234,"is_bot":false,"first_name":"Admin","username":"admin","language_code":"ru"},"chat_instance":"live_test","data":"approval:confirm:cmoq1j9wp000szyudxgyf7dbj","message":{"message_id":999,"date":1777833330,"chat":{"id":1091395234,"type":"private"},"text":"approval card"}}}
