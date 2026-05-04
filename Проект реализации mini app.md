@@ -201,3 +201,15 @@
 3. post-deploy smoke (user/admin + bot regression),
 4. rollback через feature flags.
 3. Следующий шаг: выполнить rollout на сервере и пройти smoke-check в Telegram.
+
+## Обновление 2026-05-04 (M7 rollout: server-side выполнен)
+1. Код из `dev` выложен на production сервер `/opt/calendarbot`.
+2. Контейнер пересобран и перезапущен (`docker compose up -d --build`).
+3. Production env дополнен:
+1. `MINI_APP_ADMIN_PIN=1234`
+2. `MINI_APP_BROWSER_AUTH_ENABLED=false`
+4. Проверено:
+1. `GET /health` -> `{"status":"ok"}`
+2. `https://calendar.my-ai-helper.ru/miniapp` -> `200 OK`
+3. Логи `app_started`, `mini_app_menu_button_configured`, `healthcheck_ok`.
+5. Для полного закрытия M7 остается пользовательский smoke в Telegram (user/admin сценарии).
