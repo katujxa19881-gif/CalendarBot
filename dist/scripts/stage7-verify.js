@@ -148,11 +148,6 @@ async function run() {
             botToken: "1:test-token",
             dryRun: true,
             adminTelegramId: "999999",
-            availabilityProvider: {
-                async getBusyIntervals() {
-                    return [];
-                }
-            },
             calendarEventSyncProvider: {
                 async createEvent() {
                     return {

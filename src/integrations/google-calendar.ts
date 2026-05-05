@@ -51,6 +51,13 @@ export type CalendarEventSyncProvider = {
   cancelEvent(input: CalendarEventCancelInput): Promise<void>;
 };
 
+export type GoogleOAuthStatus = {
+  connected: boolean;
+  calendarId: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+};
+
 type GoogleCalendarContext = {
   calendarId: string;
   calendar: ReturnType<typeof google.calendar>;
@@ -379,4 +386,61 @@ export function createGoogleCalendarEventSyncProvider(): CalendarEventSyncProvid
       }
     }
   };
+}
+
+export async function getGoogleOAuthStatus(): Promise<GoogleOAuthStatus> {
+  const config = getGoogleCalendarConfig();
+  if (!config.enabled || !config.clientId || !config.clientSecret || !config.refreshToken) {
+    return {
+      connected: false,
+      calendarId: config.calendarId ?? null,
+      errorCode: "GOOGLE_CONFIG_INCOMPLETE",
+      errorMessage: "Заполните GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REFRESH_TOKEN"
+    };
+  }
+
+  try {
+    const oauth2Client = new google.auth.OAuth2(config.clientId, config.clientSecret);
+    oauth2Client.setCredentials({ refresh_token: config.refreshToken });
+    const accessToken = await oauth2Client.getAccessToken();
+    const token =
+      typeof accessToken === "string"
+        ? accessToken
+        : typeof accessToken?.token === "string"
+          ? accessToken.token
+          : null;
+
+    if (!token) {
+      return {
+        connected: false,
+        calendarId: config.calendarId,
+        errorCode: "GOOGLE_ACCESS_TOKEN_MISSING",
+        errorMessage: "Google OAuth не вернул access token"
+      };
+    }
+
+    const calendar = google.calendar({ version: "v3", auth: oauth2Client });
+    await calendar.freebusy.query({
+      requestBody: {
+        timeMin: new Date().toISOString(),
+        timeMax: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        timeZone: "Europe/Moscow",
+        items: [{ id: config.calendarId }]
+      }
+    });
+
+    return {
+      connected: true,
+      calendarId: config.calendarId,
+      errorCode: null,
+      errorMessage: null
+    };
+  } catch (error) {
+    return {
+      connected: false,
+      calendarId: config.calendarId,
+      errorCode: "GOOGLE_OAUTH_CHECK_FAILED",
+      errorMessage: normalizeErrorMessage(error)
+    };
+  }
 }

@@ -103,6 +103,51 @@ function startTelegramPollingLoop(runtime) {
         stopped = true;
     };
 }
+async function configureMiniAppMenuButton() {
+    const miniAppConfig = (0, env_1.getMiniAppConfig)();
+    const telegramConfig = (0, env_1.getTelegramConfig)();
+    const webAppUrl = miniAppConfig.webAppUrl?.trim();
+    if (!miniAppConfig.enabled || !webAppUrl || !telegramConfig.botToken) {
+        return;
+    }
+    try {
+        const response = await fetch(`https://api.telegram.org/bot${telegramConfig.botToken}/setChatMenuButton`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                menu_button: {
+                    type: "web_app",
+                    text: miniAppConfig.menuButtonText,
+                    web_app: {
+                        url: webAppUrl
+                    }
+                }
+            })
+        });
+        if (!response.ok) {
+            const body = (await response.text()).slice(0, 500);
+            throw new Error(`setChatMenuButton HTTP ${response.status}: ${body}`);
+        }
+        (0, logger_1.logEvent)({
+            operation: "mini_app_menu_button_configured",
+            status: "ok",
+            details: {
+                mini_app_url: webAppUrl
+            }
+        });
+    }
+    catch (error) {
+        (0, logger_1.logEvent)({
+            level: "error",
+            operation: "mini_app_menu_button_configured",
+            status: "error",
+            error_code: "MINI_APP_MENU_BUTTON_CONFIG_FAILED",
+            error_message: error instanceof Error ? error.message : "Failed to configure mini app menu button"
+        });
+    }
+}
 async function bootstrap() {
     try {
         const { sqlitePath, databaseUrl } = (0, env_1.resolveDatabaseUrl)();
@@ -124,6 +169,7 @@ async function bootstrap() {
             status: "ok",
             details: { host, port }
         });
+        await configureMiniAppMenuButton();
         (0, worker_1.startBackgroundWorker)();
         const telegramRuntime = (0, bot_1.getTelegramRuntime)();
         const telegramTransport = (process.env.TELEGRAM_TRANSPORT ?? "polling").trim().toLowerCase();

@@ -15,6 +15,11 @@ import { Bot, Context, InlineKeyboard, webhookCallback } from "grammy";
 import { z } from "zod";
 import { prisma } from "../db";
 import {
+  AvailableSlot,
+  buildAvailableSlots as buildAvailableSlotsShared,
+  ensureSlotStillAvailable as ensureSlotStillAvailableShared
+} from "../application/slots";
+import {
   cancelPendingBackgroundJobsByTypes,
   cancelPendingApprovalReminderJobs,
   scheduleApprovalReminderJob,
@@ -23,13 +28,10 @@ import {
 } from "../background/jobs";
 import { getMeetingSettings, patchMeetingSettings, type MeetingSettings } from "../domain/app-settings";
 import { transitionMeetingRequestStatus } from "../domain/meeting-request-status";
-import { getApprovalConfig, getTelegramConfig } from "../env";
+import { getApprovalConfig, getMiniAppConfig, getTelegramConfig } from "../env";
 import {
-  BusyInterval,
-  CalendarAvailabilityProvider,
   CalendarEventCreateResult,
   CalendarEventSyncProvider,
-  createGoogleCalendarAvailabilityProvider,
   createGoogleCalendarEventSyncProvider
 } from "../integrations/google-calendar";
 import { logEvent } from "../logger";
@@ -66,11 +68,7 @@ type AppContext = Context & {
   };
 };
 
-type Slot = {
-  startAt: Date;
-  endAt: Date;
-  label: string;
-};
+type Slot = AvailableSlot;
 
 type TelegramBotRuntime = {
   bot: Bot<AppContext>;
@@ -81,21 +79,13 @@ type CreateTelegramBotRuntimeOptions = {
   botToken: string;
   webhookSecretToken?: string | null;
   dryRun?: boolean;
-  availabilityProvider?: CalendarAvailabilityProvider | null;
   calendarEventSyncProvider?: CalendarEventSyncProvider | null;
   adminTelegramId?: string | null;
 };
 
 const DURATION_OPTIONS: DurationOption[] = [15, 30, 45, 60, 90];
-const MOSCOW_UTC_OFFSET_MINUTES = 180;
 const DRAFT_TTL_HOURS = 24;
 const PROCESSED_UPDATE_TTL_MS = 10 * 60 * 1000;
-const ACTIVE_SLOT_LOCK_STATUSES: MeetingRequestStatus[] = [
-  MeetingRequestStatus.PENDING_APPROVAL,
-  MeetingRequestStatus.APPROVED,
-  MeetingRequestStatus.RESCHEDULE_REQUESTED,
-  MeetingRequestStatus.RESCHEDULED
-];
 
 const EMAIL_SCHEMA = z.string().email();
 
@@ -136,7 +126,6 @@ const ANTI_SPAM_ACTION_MS = 2500;
 
 let runtimeCache: TelegramBotRuntime | null = null;
 let runtimeCacheToken: string | null = null;
-let runtimeAvailabilityProvider: CalendarAvailabilityProvider | null = createGoogleCalendarAvailabilityProvider();
 let runtimeCalendarEventSyncProvider: CalendarEventSyncProvider | null = createGoogleCalendarEventSyncProvider();
 let runtimeAdminTelegramId: string | null = getApprovalConfig().adminTelegramId;
 const pendingRejectionCommentByAdmin = new Map<string, string>();
@@ -333,35 +322,6 @@ function nowPlusHours(hours: number): Date {
   return new Date(Date.now() + hours * 60 * 60 * 1000);
 }
 
-function toMoscowDate(date: Date): Date {
-  return new Date(date.getTime() + MOSCOW_UTC_OFFSET_MINUTES * 60 * 1000);
-}
-
-function fromMoscowPartsToUtcDate(
-  year: number,
-  month: number,
-  day: number,
-  hour: number,
-  minute: number
-): Date {
-  const utcMs = Date.UTC(year, month - 1, day, hour, minute) - MOSCOW_UTC_OFFSET_MINUTES * 60 * 1000;
-  return new Date(utcMs);
-}
-
-function floorToMinute(date: Date): Date {
-  return new Date(Math.floor(date.getTime() / 60000) * 60000);
-}
-
-function roundUpToThirtyMinutes(date: Date): Date {
-  const rounded = floorToMinute(date);
-  const minute = rounded.getUTCMinutes();
-  const remainder = minute % 30;
-  if (remainder === 0) {
-    return rounded;
-  }
-  return new Date(rounded.getTime() + (30 - remainder) * 60000);
-}
-
 function formatDateTimeMoscow(date: Date): string {
   return new Intl.DateTimeFormat("ru-RU", {
     timeZone: "Europe/Moscow",
@@ -394,13 +354,15 @@ function formatDateRangeMoscow(startAt: Date, endAt: Date): string {
 }
 
 function formatRequestCode(meetingRequest: Pick<MeetingRequest, "createdAt">): string {
-  const createdAt = new Date(meetingRequest.createdAt);
-  const y = createdAt.getUTCFullYear();
-  const m = String(createdAt.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(createdAt.getUTCDate()).padStart(2, "0");
-  const hh = String(createdAt.getUTCHours()).padStart(2, "0");
-  const mm = String(createdAt.getUTCMinutes()).padStart(2, "0");
-  return `REQ-${y}${m}${d}-${hh}${mm}`;
+  const parts = new Intl.DateTimeFormat("ru-RU", {
+    timeZone: "Europe/Moscow",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(new Date(meetingRequest.createdAt));
+  const hh = parts.find((part) => part.type === "hour")?.value ?? "00";
+  const mm = parts.find((part) => part.type === "minute")?.value ?? "00";
+  return `#${hh}${mm}`;
 }
 
 function formatHistoryStatus(status: MeetingRequestStatus): string {
@@ -476,176 +438,6 @@ function formatReview(payload: DraftPayload): string {
   }
 
   return lines.join("\n");
-}
-
-function buildCandidateSlots(durationMinutes: number, settings: MeetingSettings): Slot[] {
-  const slots: Slot[] = [];
-  const minStart = roundUpToThirtyMinutes(new Date(Date.now() + settings.slotMinLeadHours * 60 * 60 * 1000));
-
-  const nowMoscow = toMoscowDate(new Date());
-  const baseYear = nowMoscow.getUTCFullYear();
-  const baseMonth = nowMoscow.getUTCMonth() + 1;
-  const baseDay = nowMoscow.getUTCDate();
-
-  for (let dayOffset = 0; dayOffset <= settings.slotHorizonDays; dayOffset += 1) {
-    const dayStartUtc = fromMoscowPartsToUtcDate(baseYear, baseMonth, baseDay + dayOffset, 0, 0);
-    const dayMoscow = toMoscowDate(dayStartUtc);
-    const dayOfWeek = dayMoscow.getUTCDay();
-
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-      continue;
-    }
-
-    for (let hour = settings.workdayStartHour; hour < settings.workdayEndHour; hour += 1) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const startAt = fromMoscowPartsToUtcDate(
-          dayMoscow.getUTCFullYear(),
-          dayMoscow.getUTCMonth() + 1,
-          dayMoscow.getUTCDate(),
-          hour,
-          minute
-        );
-
-        if (startAt.getTime() < minStart.getTime()) {
-          continue;
-        }
-
-        const endAt = new Date(startAt.getTime() + durationMinutes * 60 * 1000);
-        const endMoscow = toMoscowDate(endAt);
-
-        if (
-          endMoscow.getUTCFullYear() !== dayMoscow.getUTCFullYear() ||
-          endMoscow.getUTCMonth() !== dayMoscow.getUTCMonth() ||
-          endMoscow.getUTCDate() !== dayMoscow.getUTCDate()
-        ) {
-          continue;
-        }
-
-        const endTotalMinutes = endMoscow.getUTCHours() * 60 + endMoscow.getUTCMinutes();
-        if (endTotalMinutes > settings.workdayEndHour * 60) {
-          continue;
-        }
-
-        slots.push({
-          startAt,
-          endAt,
-          label: formatDateTimeMoscow(startAt)
-        });
-      }
-    }
-  }
-
-  return slots;
-}
-
-function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {
-  return aStart.getTime() < bEnd.getTime() && bStart.getTime() < aEnd.getTime();
-}
-
-function withSlotBuffer(startAt: Date, endAt: Date, settings: MeetingSettings): BusyInterval {
-  return {
-    startAt: new Date(startAt.getTime() - settings.slotBufferMinutes * 60 * 1000),
-    endAt: new Date(endAt.getTime() + settings.slotBufferMinutes * 60 * 1000)
-  };
-}
-
-function isSlotAvailable(slot: Slot, busyIntervals: BusyInterval[], settings: MeetingSettings): boolean {
-  const bufferedSlot = withSlotBuffer(slot.startAt, slot.endAt, settings);
-
-  return !busyIntervals.some((busy) => overlaps(bufferedSlot.startAt, bufferedSlot.endAt, busy.startAt, busy.endAt));
-}
-
-async function getLocalBusyIntervals(
-  timeMin: Date,
-  timeMax: Date,
-  excludeMeetingRequestId?: string
-): Promise<BusyInterval[]> {
-  const requests = await prisma.meetingRequest.findMany({
-    where: {
-      status: { in: ACTIVE_SLOT_LOCK_STATUSES },
-      ...(excludeMeetingRequestId
-        ? {
-            id: {
-              not: excludeMeetingRequestId
-            }
-          }
-        : {}),
-      startAt: { lt: timeMax },
-      endAt: { gt: timeMin }
-    },
-    select: {
-      startAt: true,
-      endAt: true
-    }
-  });
-
-  return requests.map((request) => ({
-    startAt: request.startAt,
-    endAt: request.endAt
-  }));
-}
-
-async function getBusyIntervalsForRange(
-  timeMin: Date,
-  timeMax: Date,
-  excludeMeetingRequestId?: string
-): Promise<BusyInterval[]> {
-  const localBusyPromise = getLocalBusyIntervals(timeMin, timeMax, excludeMeetingRequestId);
-  const calendarBusyPromise = runtimeAvailabilityProvider
-    ? runtimeAvailabilityProvider.getBusyIntervals({ timeMin, timeMax })
-    : Promise.resolve<BusyInterval[]>([]);
-
-  const [calendarBusy, localBusy] = await Promise.all([calendarBusyPromise, localBusyPromise]);
-  return [...calendarBusy, ...localBusy];
-}
-
-async function buildAvailableSlots(durationMinutes: number, excludeMeetingRequestId?: string): Promise<Slot[]> {
-  const settings = await getCachedMeetingSettings();
-  const candidates = buildCandidateSlots(durationMinutes, settings);
-
-  if (candidates.length === 0) {
-    return [];
-  }
-
-  const firstCandidate = candidates[0];
-  const lastCandidate = candidates[candidates.length - 1];
-
-  const rangeStart = new Date(firstCandidate.startAt.getTime() - settings.slotBufferMinutes * 60 * 1000);
-  const rangeEnd = new Date(lastCandidate.endAt.getTime() + settings.slotBufferMinutes * 60 * 1000);
-
-  const busyIntervals = await getBusyIntervalsForRange(rangeStart, rangeEnd, excludeMeetingRequestId);
-  const available = candidates
-    .filter((slot) => isSlotAvailable(slot, busyIntervals, settings))
-    .slice(0, settings.slotLimit);
-
-  logEvent({
-    operation: "slots_built",
-    status: "ok",
-    details: {
-      duration_minutes: durationMinutes,
-      candidates_count: candidates.length,
-      busy_count: busyIntervals.length,
-      slots_count: available.length,
-      slot_limit: settings.slotLimit
-    }
-  });
-
-  return available;
-}
-
-async function ensureSlotStillAvailable(
-  startAt: Date,
-  endAt: Date,
-  excludeMeetingRequestId?: string
-): Promise<boolean> {
-  const settings = await getCachedMeetingSettings();
-  const bufferedSlot = withSlotBuffer(startAt, endAt, settings);
-  const busyIntervals = await getBusyIntervalsForRange(
-    bufferedSlot.startAt,
-    bufferedSlot.endAt,
-    excludeMeetingRequestId
-  );
-  return !busyIntervals.some((busy) => overlaps(bufferedSlot.startAt, bufferedSlot.endAt, busy.startAt, busy.endAt));
 }
 
 async function upsertUserFromContext(ctx: AppContext): Promise<User | null> {
@@ -884,6 +676,8 @@ function getPreviousStep(currentStep: WizardStep, payload: DraftPayload): Wizard
 
 function startMenuKeyboard(hasDraft: boolean): InlineKeyboard {
   const keyboard = new InlineKeyboard();
+  const miniAppConfig = getMiniAppConfig();
+  const webAppUrl = miniAppConfig.webAppUrl?.trim();
 
   if (hasDraft) {
     keyboard.text("Продолжить", ACTION.MENU_RESUME).text("Начать заново", ACTION.MENU_RESTART).row();
@@ -892,6 +686,9 @@ function startMenuKeyboard(hasDraft: boolean): InlineKeyboard {
   }
 
   keyboard.text("Мои заявки", ACTION.MENU_HISTORY);
+  if (miniAppConfig.enabled && webAppUrl) {
+    keyboard.row().webApp("Mini App", webAppUrl);
+  }
   return keyboard;
 }
 
@@ -1261,7 +1058,9 @@ async function showStepPrompt(
 
     let slots: Slot[];
     try {
-      slots = await buildAvailableSlots(payload.durationMinutes);
+      slots = await buildAvailableSlotsShared({
+        durationMinutes: payload.durationMinutes
+      });
     } catch {
       await ctx.reply("Календарь сейчас недоступен. Попробуйте выбрать время немного позже.", {
         reply_markup: navKeyboard(true)
@@ -1436,7 +1235,10 @@ async function submitMeetingRequest(
   }
 
   try {
-    const slotStillAvailable = await ensureSlotStillAvailable(slotStartAt, slotEndAt);
+    const slotStillAvailable = await ensureSlotStillAvailableShared({
+      startAt: slotStartAt,
+      endAt: slotEndAt
+    });
     if (!slotStillAvailable) {
       logEvent({
         level: "warn",
@@ -2133,7 +1935,10 @@ async function requestRescheduleByUser(ctx: AppContext, user: User, meetingReque
     return;
   }
 
-  const slots = await buildAvailableSlots(request.durationMinutes, request.id);
+  const slots = await buildAvailableSlotsShared({
+    durationMinutes: request.durationMinutes,
+    excludeMeetingRequestId: request.id
+  });
   if (slots.length === 0) {
     await ctx.reply("Свободные слоты для переноса не найдены в ближайшие 30 дней.");
     return;
@@ -2220,14 +2025,21 @@ async function completeRescheduleByUser(
   }
 
   try {
-    const slots = await buildAvailableSlots(request.durationMinutes, request.id);
+    const slots = await buildAvailableSlotsShared({
+      durationMinutes: request.durationMinutes,
+      excludeMeetingRequestId: request.id
+    });
     const selectedSlot = slots[slotIndex];
     if (!selectedSlot) {
       await ctx.reply("Выбранный слот недоступен. Нажмите «Перенести» и выберите заново.");
       return;
     }
 
-    const slotStillAvailable = await ensureSlotStillAvailable(selectedSlot.startAt, selectedSlot.endAt, request.id);
+    const slotStillAvailable = await ensureSlotStillAvailableShared({
+      startAt: selectedSlot.startAt,
+      endAt: selectedSlot.endAt,
+      excludeMeetingRequestId: request.id
+    });
     if (!slotStillAvailable) {
       await ctx.reply("Этот слот уже занят. Нажмите «Перенести» и выберите другой.");
       return;
@@ -2545,10 +2357,6 @@ function configureDryRunApi(bot: Bot<AppContext>): void {
 export function createTelegramBotRuntime(
   options: CreateTelegramBotRuntimeOptions
 ): TelegramBotRuntime {
-  runtimeAvailabilityProvider =
-    options.availabilityProvider === undefined
-      ? createGoogleCalendarAvailabilityProvider()
-      : options.availabilityProvider;
   runtimeCalendarEventSyncProvider =
     options.calendarEventSyncProvider === undefined
       ? createGoogleCalendarEventSyncProvider()
@@ -2705,6 +2513,19 @@ export function createTelegramBotRuntime(
 
   bot.command("version", async (ctx) => {
     await ctx.reply(`Версия: ${BOT_BUILD_LABEL}\nPID: ${process.pid}`);
+  });
+
+  bot.command("app", async (ctx) => {
+    const miniAppConfig = getMiniAppConfig();
+    const webAppUrl = miniAppConfig.webAppUrl?.trim();
+    if (!miniAppConfig.enabled || !webAppUrl) {
+      await ctx.reply("Mini app пока не включен.");
+      return;
+    }
+
+    await ctx.reply("Открыть mini app:", {
+      reply_markup: new InlineKeyboard().webApp("Открыть NexaMeet", webAppUrl)
+    });
   });
 
   bot.callbackQuery(ACTION.CONSENT_ACCEPT, async (ctx) => {
@@ -2889,7 +2710,9 @@ export function createTelegramBotRuntime(
 
     let slots: Slot[];
     try {
-      slots = await buildAvailableSlots(payload.durationMinutes);
+      slots = await buildAvailableSlotsShared({
+        durationMinutes: payload.durationMinutes
+      });
     } catch {
       await ctx.reply("Не удалось получить доступные слоты из календаря. Попробуйте позже.");
       return;

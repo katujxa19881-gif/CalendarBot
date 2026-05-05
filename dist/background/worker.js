@@ -31,12 +31,15 @@ function formatDateRangeMoscow(startAt, endAt) {
     return `${date} ${start} - ${end} (МСК)`;
 }
 function formatRequestCode(createdAt) {
-    const y = createdAt.getUTCFullYear();
-    const m = String(createdAt.getUTCMonth() + 1).padStart(2, "0");
-    const d = String(createdAt.getUTCDate()).padStart(2, "0");
-    const hh = String(createdAt.getUTCHours()).padStart(2, "0");
-    const mm = String(createdAt.getUTCMinutes()).padStart(2, "0");
-    return `REQ-${y}${m}${d}-${hh}${mm}`;
+    const parts = new Intl.DateTimeFormat("ru-RU", {
+        timeZone: "Europe/Moscow",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23"
+    }).formatToParts(createdAt);
+    const hh = parts.find((part) => part.type === "hour")?.value ?? "00";
+    const mm = parts.find((part) => part.type === "minute")?.value ?? "00";
+    return `#${hh}${mm}`;
 }
 function buildDependencies(input) {
     const telegramConfig = (0, env_1.getTelegramConfig)();
@@ -60,7 +63,8 @@ function createTelegramAdminNotifier(botToken) {
                 },
                 body: JSON.stringify({
                     chat_id: input.chatId,
-                    text: input.text
+                    text: input.text,
+                    reply_markup: input.replyMarkup
                 })
             });
             if (!response.ok) {
@@ -360,7 +364,15 @@ async function processApprovalReminderJob(job, deps) {
     lines.push(`Дата и время: ${formatDateRangeMoscow(request.startAt, request.endAt)}`);
     await deps.adminNotifier.sendMessage({
         chatId: deps.adminTelegramId,
-        text: lines.join("\n")
+        text: lines.join("\n"),
+        replyMarkup: {
+            inline_keyboard: [
+                [
+                    { text: "Подтвердить", callback_data: `approval:confirm:${request.id}` },
+                    { text: "Отклонить", callback_data: `approval:reject:${request.id}` }
+                ]
+            ]
+        }
     });
     (0, logger_1.logEvent)({
         operation: "reminder_sent",

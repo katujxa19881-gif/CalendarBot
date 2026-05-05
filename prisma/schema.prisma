@@ -89,6 +89,7 @@ model AppSettings {
   id                 Int      @id
   workdayStartHour   Int      @default(10)
   workdayEndHour     Int      @default(18)
+  workdays           String   @default("1,2,3,4,5")
   slotLimit          Int      @default(8)
   slotBufferMinutes  Int      @default(15)
   slotMinLeadHours   Int      @default(1)

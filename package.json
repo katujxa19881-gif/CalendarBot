@@ -18,7 +18,9 @@
     "stage5:verify": "tsx src/scripts/stage5-verify.ts",
     "stage6:verify": "tsx src/scripts/stage6-verify.ts",
     "stage7:verify": "tsx src/scripts/stage7-verify.ts",
-    "stage8:verify": "tsx src/scripts/stage8-verify.ts"
+    "stage8:verify": "tsx src/scripts/stage8-verify.ts",
+    "stage9:verify": "tsx src/scripts/stage9-verify.ts",
+    "stage10:verify": "tsx src/scripts/stage10-verify.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",

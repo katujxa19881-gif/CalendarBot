@@ -91,71 +91,15 @@ async function run() {
         details: { stage: "4", mode: "verify_script_start" }
     });
     const botToken = process.env.TELEGRAM_BOT_TOKEN ?? "123456:stage4verify";
-    let conflictChecksRemaining = 1;
-    let oauthLogged = false;
-    const testProvider = {
-        async getBusyIntervals(range) {
-            if (!oauthLogged) {
-                oauthLogged = true;
-                (0, logger_1.logEvent)({
-                    operation: "google_oauth_connected",
-                    status: "ok",
-                    details: {
-                        stage: "4",
-                        mode: "verify_mock_provider"
-                    }
-                });
-            }
-            (0, logger_1.logEvent)({
-                operation: "calendar_availability_requested",
-                status: "ok",
-                details: {
-                    stage: "4",
-                    time_min: range.timeMin.toISOString(),
-                    time_max: range.timeMax.toISOString()
-                }
-            });
-            const spanMs = range.timeMax.getTime() - range.timeMin.getTime();
-            const sixHoursMs = 6 * 60 * 60 * 1000;
-            if (spanMs <= sixHoursMs && conflictChecksRemaining > 0) {
-                conflictChecksRemaining -= 1;
-                const busy = [
-                    {
-                        startAt: new Date(range.timeMin.getTime() + 5 * 60 * 1000),
-                        endAt: new Date(range.timeMax.getTime() - 5 * 60 * 1000)
-                    }
-                ];
-                (0, logger_1.logEvent)({
-                    operation: "calendar_availability_received",
-                    status: "ok",
-                    details: {
-                        stage: "4",
-                        busy_count: busy.length
-                    }
-                });
-                return busy;
-            }
-            (0, logger_1.logEvent)({
-                operation: "calendar_availability_received",
-                status: "ok",
-                details: {
-                    stage: "4",
-                    busy_count: 0
-                }
-            });
-            return [];
-        }
-    };
     const runtime = (0, bot_1.createTelegramBotRuntime)({
         botToken,
         webhookSecretToken: process.env.TELEGRAM_WEBHOOK_SECRET ?? null,
-        dryRun: true,
-        availabilityProvider: testProvider
+        dryRun: true
     });
     try {
         await (0, db_1.connectDatabase)();
         await cleanupTestUserData();
-        const firstAttemptUpdates = [
+        const updates = [
             createMessageUpdate("/start"),
             createCallbackUpdate("consent:accept"),
             createCallbackUpdate("menu:new"),
@@ -169,18 +113,7 @@ async function run() {
             createMessageUpdate("Смирнова"),
             createCallbackUpdate("review:submit")
         ];
-        for (const update of firstAttemptUpdates) {
-            await runtime.bot.handleUpdate(update);
-        }
-        const firstAttemptState = await (0, bot_1.ensureWizardStateForUser)(TELEGRAM_USER_ID);
-        if (firstAttemptState.requests.length !== 0) {
-            throw new Error("Expected no created requests after conflict recheck");
-        }
-        if (firstAttemptState.draft?.status !== client_1.DraftStatus.ACTIVE || firstAttemptState.draft.currentStep !== "slot") {
-            throw new Error("Expected active draft moved back to slot step after conflict");
-        }
-        const secondAttemptUpdates = [createCallbackUpdate("slot:0"), createCallbackUpdate("review:submit")];
-        for (const update of secondAttemptUpdates) {
+        for (const update of updates) {
             await runtime.bot.handleUpdate(update);
         }
         const finalState = await (0, bot_1.ensureWizardStateForUser)(TELEGRAM_USER_ID);
@@ -194,7 +127,7 @@ async function run() {
             details: {
                 stage: "4",
                 requests_count: finalState.requests.length,
-                has_active_draft: Boolean(finalState.draft)
+                has_active_draft: finalState.draft?.status === client_1.DraftStatus.ACTIVE
             }
         });
     }

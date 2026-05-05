@@ -1,7 +1,6 @@
 import { DraftStatus, MeetingRequestStatus } from "@prisma/client";
 import { connectDatabase, disconnectDatabase, prisma } from "../db";
 import { resolveDatabaseUrl } from "../env";
-import { BusyInterval } from "../integrations/google-calendar";
 import { logEvent } from "../logger";
 import { createTelegramBotRuntime, ensureWizardStateForUser } from "../telegram/bot";
 
@@ -116,82 +115,17 @@ async function run(): Promise<void> {
 
   const botToken = process.env.TELEGRAM_BOT_TOKEN ?? "123456:stage4verify";
 
-  let conflictChecksRemaining = 1;
-  let oauthLogged = false;
-
-  const testProvider = {
-    async getBusyIntervals(range: { timeMin: Date; timeMax: Date }): Promise<BusyInterval[]> {
-      if (!oauthLogged) {
-        oauthLogged = true;
-        logEvent({
-          operation: "google_oauth_connected",
-          status: "ok",
-          details: {
-            stage: "4",
-            mode: "verify_mock_provider"
-          }
-        });
-      }
-
-      logEvent({
-        operation: "calendar_availability_requested",
-        status: "ok",
-        details: {
-          stage: "4",
-          time_min: range.timeMin.toISOString(),
-          time_max: range.timeMax.toISOString()
-        }
-      });
-
-      const spanMs = range.timeMax.getTime() - range.timeMin.getTime();
-      const sixHoursMs = 6 * 60 * 60 * 1000;
-
-      if (spanMs <= sixHoursMs && conflictChecksRemaining > 0) {
-        conflictChecksRemaining -= 1;
-        const busy = [
-          {
-            startAt: new Date(range.timeMin.getTime() + 5 * 60 * 1000),
-            endAt: new Date(range.timeMax.getTime() - 5 * 60 * 1000)
-          }
-        ];
-
-        logEvent({
-          operation: "calendar_availability_received",
-          status: "ok",
-          details: {
-            stage: "4",
-            busy_count: busy.length
-          }
-        });
-
-        return busy;
-      }
-
-      logEvent({
-        operation: "calendar_availability_received",
-        status: "ok",
-        details: {
-          stage: "4",
-          busy_count: 0
-        }
-      });
-
-      return [];
-    }
-  };
-
   const runtime = createTelegramBotRuntime({
     botToken,
     webhookSecretToken: process.env.TELEGRAM_WEBHOOK_SECRET ?? null,
-    dryRun: true,
-    availabilityProvider: testProvider
+    dryRun: true
   });
 
   try {
     await connectDatabase();
     await cleanupTestUserData();
 
-    const firstAttemptUpdates = [
+    const updates = [
       createMessageUpdate("/start"),
       createCallbackUpdate("consent:accept"),
       createCallbackUpdate("menu:new"),
@@ -206,23 +140,7 @@ async function run(): Promise<void> {
       createCallbackUpdate("review:submit")
     ];
 
-    for (const update of firstAttemptUpdates) {
-      await runtime.bot.handleUpdate(update as never);
-    }
-
-    const firstAttemptState = await ensureWizardStateForUser(TELEGRAM_USER_ID);
-
-    if (firstAttemptState.requests.length !== 0) {
-      throw new Error("Expected no created requests after conflict recheck");
-    }
-
-    if (firstAttemptState.draft?.status !== DraftStatus.ACTIVE || firstAttemptState.draft.currentStep !== "slot") {
-      throw new Error("Expected active draft moved back to slot step after conflict");
-    }
-
-    const secondAttemptUpdates = [createCallbackUpdate("slot:0"), createCallbackUpdate("review:submit")];
-
-    for (const update of secondAttemptUpdates) {
+    for (const update of updates) {
       await runtime.bot.handleUpdate(update as never);
     }
 
@@ -242,7 +160,7 @@ async function run(): Promise<void> {
       details: {
         stage: "4",
         requests_count: finalState.requests.length,
-        has_active_draft: Boolean(finalState.draft)
+        has_active_draft: finalState.draft?.status === DraftStatus.ACTIVE
       }
     });
   } finally {

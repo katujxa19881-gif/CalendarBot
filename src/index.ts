@@ -1,6 +1,6 @@
 import { buildServer } from "./server";
 import { connectDatabase, disconnectDatabase } from "./db";
-import { getServerConfig, resolveDatabaseUrl } from "./env";
+import { getMiniAppConfig, getServerConfig, getTelegramConfig, resolveDatabaseUrl } from "./env";
 import { getTelegramRuntime } from "./telegram/bot";
 import { logEvent } from "./logger";
 import { startBackgroundWorker, stopBackgroundWorker } from "./background/worker";
@@ -124,6 +124,55 @@ function startTelegramPollingLoop(runtime: NonNullable<ReturnType<typeof getTele
   };
 }
 
+async function configureMiniAppMenuButton(): Promise<void> {
+  const miniAppConfig = getMiniAppConfig();
+  const telegramConfig = getTelegramConfig();
+  const webAppUrl = miniAppConfig.webAppUrl?.trim();
+
+  if (!miniAppConfig.enabled || !webAppUrl || !telegramConfig.botToken) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${telegramConfig.botToken}/setChatMenuButton`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        menu_button: {
+          type: "web_app",
+          text: miniAppConfig.menuButtonText,
+          web_app: {
+            url: webAppUrl
+          }
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const body = (await response.text()).slice(0, 500);
+      throw new Error(`setChatMenuButton HTTP ${response.status}: ${body}`);
+    }
+
+    logEvent({
+      operation: "mini_app_menu_button_configured",
+      status: "ok",
+      details: {
+        mini_app_url: webAppUrl
+      }
+    });
+  } catch (error) {
+    logEvent({
+      level: "error",
+      operation: "mini_app_menu_button_configured",
+      status: "error",
+      error_code: "MINI_APP_MENU_BUTTON_CONFIG_FAILED",
+      error_message: error instanceof Error ? error.message : "Failed to configure mini app menu button"
+    });
+  }
+}
+
 async function bootstrap() {
   try {
     const { sqlitePath, databaseUrl } = resolveDatabaseUrl();
@@ -149,6 +198,7 @@ async function bootstrap() {
       status: "ok",
       details: { host, port }
     });
+    await configureMiniAppMenuButton();
     startBackgroundWorker();
 
     const telegramRuntime = getTelegramRuntime();

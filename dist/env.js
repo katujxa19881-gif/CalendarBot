@@ -10,6 +10,7 @@ exports.getGoogleCalendarConfig = getGoogleCalendarConfig;
 exports.getApprovalConfig = getApprovalConfig;
 exports.getEmailConfig = getEmailConfig;
 exports.getBackgroundJobsConfig = getBackgroundJobsConfig;
+exports.getMiniAppConfig = getMiniAppConfig;
 const node_fs_1 = require("node:fs");
 const node_path_1 = __importDefault(require("node:path"));
 const dotenv_1 = __importDefault(require("dotenv"));
@@ -72,5 +73,35 @@ function getBackgroundJobsConfig() {
         enabled,
         pollIntervalMs: Number.isFinite(pollIntervalMs) && pollIntervalMs > 0 ? pollIntervalMs : 15000,
         batchSize: Number.isFinite(batchSize) && batchSize > 0 ? Math.floor(batchSize) : 10
+    };
+}
+function getMiniAppConfig() {
+    const enabledRaw = (process.env.MINI_APP_ENABLED ?? "false").trim().toLowerCase();
+    const adminEnabledRaw = (process.env.MINI_APP_ADMIN_ENABLED ?? "false").trim().toLowerCase();
+    const adminPinRaw = (process.env.MINI_APP_ADMIN_PIN ?? "1234").trim();
+    const browserAuthEnabledRaw = (process.env.MINI_APP_BROWSER_AUTH_ENABLED ?? "false").trim().toLowerCase();
+    const onboardingEnabledRaw = (process.env.MINI_APP_ONBOARDING_ENABLED ?? "true").trim().toLowerCase();
+    const authMaxAgeSeconds = Number(process.env.MINI_APP_AUTH_MAX_AGE_SECONDS ?? 86400);
+    const sessionTtlSeconds = Number(process.env.MINI_APP_SESSION_TTL_SECONDS ?? 43200);
+    const sessionSecret = process.env.MINI_APP_SESSION_SECRET ?? process.env.TELEGRAM_BOT_TOKEN ?? null;
+    const webAppUrl = process.env.MINI_APP_URL ?? null;
+    const menuButtonText = process.env.MINI_APP_MENU_BUTTON_TEXT ?? "Открыть NexaMeet";
+    const browserAuthTelegramId = (process.env.MINI_APP_BROWSER_AUTH_TELEGRAM_ID ?? "").trim() || null;
+    return {
+        enabled: enabledRaw === "1" || enabledRaw === "true" || enabledRaw === "yes",
+        adminEnabled: adminEnabledRaw === "1" || adminEnabledRaw === "true" || adminEnabledRaw === "yes",
+        adminPin: adminPinRaw || null,
+        browserAuthEnabled: browserAuthEnabledRaw === "1" || browserAuthEnabledRaw === "true" || browserAuthEnabledRaw === "yes",
+        onboardingEnabled: onboardingEnabledRaw !== "0" && onboardingEnabledRaw !== "false" && onboardingEnabledRaw !== "no",
+        authMaxAgeSeconds: Number.isFinite(authMaxAgeSeconds) && authMaxAgeSeconds > 0
+            ? Math.floor(authMaxAgeSeconds)
+            : 86400,
+        sessionTtlSeconds: Number.isFinite(sessionTtlSeconds) && sessionTtlSeconds > 0
+            ? Math.floor(sessionTtlSeconds)
+            : 43200,
+        sessionSecret,
+        webAppUrl,
+        menuButtonText,
+        browserAuthTelegramId
     };
 }
