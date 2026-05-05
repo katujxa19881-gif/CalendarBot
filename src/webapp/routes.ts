@@ -175,7 +175,9 @@ function replyOperationError(reply: FastifyReply, error: unknown): void {
         ? 404
         : error.code === "REQUEST_STATUS_INVALID" ||
             error.code === "SLOT_NOT_AVAILABLE" ||
-            error.code === "CALENDAR_SYNC_FAILED"
+            error.code === "CALENDAR_SYNC_FAILED" ||
+            error.code === "CALENDAR_EVENT_MISSING" ||
+            error.code === "CALENDAR_PROVIDER_MISSING"
           ? 409
         : error.code === "SETTINGS_PATCH_INVALID"
             ? 400
