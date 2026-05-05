@@ -25,6 +25,7 @@ COPY prisma ./prisma
 RUN npx prisma generate
 
 COPY --from=builder /app/dist ./dist
+COPY src/webapp/assets ./src/webapp/assets
 COPY deploy/docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh && mkdir -p /app/data
 

@@ -13,7 +13,13 @@ import { createEmailProvider, EmailProvider, OutgoingEmail } from "../integratio
 import { logEvent } from "../logger";
 
 type AdminNotifier = {
-  sendMessage(input: { chatId: string; text: string }): Promise<void>;
+  sendMessage(input: {
+    chatId: string;
+    text: string;
+    replyMarkup?: {
+      inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
+    };
+  }): Promise<void>;
 };
 
 type WorkerDependencies = {
@@ -84,7 +90,13 @@ function createTelegramAdminNotifier(botToken: string | null): AdminNotifier | n
   }
 
   return {
-    async sendMessage(input: { chatId: string; text: string }): Promise<void> {
+    async sendMessage(input: {
+      chatId: string;
+      text: string;
+      replyMarkup?: {
+        inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
+      };
+    }): Promise<void> {
       const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
         method: "POST",
         headers: {
@@ -92,7 +104,8 @@ function createTelegramAdminNotifier(botToken: string | null): AdminNotifier | n
         },
         body: JSON.stringify({
           chat_id: input.chatId,
-          text: input.text
+          text: input.text,
+          reply_markup: input.replyMarkup
         })
       });
 
@@ -449,7 +462,15 @@ async function processApprovalReminderJob(job: BackgroundJob, deps: WorkerDepend
 
   await deps.adminNotifier.sendMessage({
     chatId: deps.adminTelegramId,
-    text: lines.join("\n")
+    text: lines.join("\n"),
+    replyMarkup: {
+      inline_keyboard: [
+        [
+          { text: "Подтвердить", callback_data: `approval:confirm:${request.id}` },
+          { text: "Отклонить", callback_data: `approval:reject:${request.id}` }
+        ]
+      ]
+    }
   });
 
   logEvent({

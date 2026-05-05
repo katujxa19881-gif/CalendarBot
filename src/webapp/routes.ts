@@ -286,8 +286,14 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
       return;
     }
 
-    const imagePath = join(process.cwd(), "src", "webapp", "assets", "home-photo.jpeg");
-    const image = await readFile(imagePath);
+    const srcPath = join(process.cwd(), "src", "webapp", "assets", "home-photo.jpeg");
+    const distPath = join(process.cwd(), "dist", "webapp", "assets", "home-photo.jpeg");
+    let image: Buffer;
+    try {
+      image = await readFile(srcPath);
+    } catch {
+      image = await readFile(distPath);
+    }
     reply.header("content-type", "image/jpeg");
     reply.header("cache-control", "no-store, no-cache, must-revalidate, proxy-revalidate");
     reply.code(200).send(image);

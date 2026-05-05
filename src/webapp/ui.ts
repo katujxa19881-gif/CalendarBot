@@ -695,6 +695,14 @@ export function renderMiniAppHtml(): string {
           'Обновила время встречи по заявке «{topic}». Актуальный слот: {date}.'
         ]
       };
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#39;');
+      }
       function renderAdminTemplatePreview() {
         if (!els.adminTemplatePreview) return;
         const blocks = [
