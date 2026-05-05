@@ -156,7 +156,12 @@ export async function listAdminRequests(input: {
   return prisma.meetingRequest.findMany({
     where,
     include: {
-      user: true
+      user: true,
+      calendarEvent: {
+        select: {
+          googleMeetLink: true
+        }
+      }
     },
     orderBy: {
       createdAt: "desc"

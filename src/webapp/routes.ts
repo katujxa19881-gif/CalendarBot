@@ -663,6 +663,13 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
       where: {
         userId: session.user.id
       },
+      include: {
+        calendarEvent: {
+          select: {
+            googleMeetLink: true
+          }
+        }
+      },
       orderBy: {
         createdAt: "desc"
       },
@@ -680,6 +687,7 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
         start_at: requestItem.startAt.toISOString(),
         end_at: requestItem.endAt.toISOString(),
         created_at: requestItem.createdAt.toISOString(),
+        google_meet_link: requestItem.calendarEvent?.googleMeetLink ?? null,
         can_cancel: isCancelAllowed(requestItem.status),
         can_reschedule: isRescheduleAllowed(requestItem.status)
       }))
@@ -702,6 +710,13 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
     const targetRequest = await prisma.meetingRequest.findUnique({
       where: {
         id: requestId
+      },
+      include: {
+        calendarEvent: {
+          select: {
+            googleMeetLink: true
+          }
+        }
       }
     });
 
@@ -738,6 +753,7 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
         start_at: targetRequest.startAt.toISOString(),
         end_at: targetRequest.endAt.toISOString(),
         created_at: targetRequest.createdAt.toISOString(),
+        google_meet_link: targetRequest.calendarEvent?.googleMeetLink ?? null,
         can_cancel: isCancelAllowed(targetRequest.status),
         can_reschedule: isRescheduleAllowed(targetRequest.status)
       }
@@ -881,6 +897,7 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
         start_at: item.startAt.toISOString(),
         end_at: item.endAt.toISOString(),
         created_at: item.createdAt.toISOString(),
+        google_meet_link: item.calendarEvent?.googleMeetLink ?? null,
         email: item.email,
         first_name: item.firstName,
         last_name: item.lastName,

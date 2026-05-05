@@ -112,6 +112,20 @@ export function renderMiniAppHtml(): string {
       pointer-events: none;
     }
     .small { font-size: 12px; }
+    .small-link {
+      font-size: 12px;
+      color: #9ee8ff;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid #1f4f6f;
+      border-radius: 999px;
+      padding: 4px 10px;
+      width: fit-content;
+      background: rgba(7, 24, 38, .6);
+    }
+    .small-link:hover { border-color: var(--cyan); }
     .ok { color: var(--ok); }
     .err { color: #ff8f9a; }
     .slot-list {
@@ -608,9 +622,13 @@ export function renderMiniAppHtml(): string {
           const selectionHtml = canManualClean
             ? '<label><input class="request-select" type="checkbox" data-request-select="' + r.id + '"' + (isSelected ? ' checked' : '') + ' />в очистку</label>'
             : '';
+          const meetLinkHtml = typeof r.google_meet_link === 'string' && r.google_meet_link.trim()
+            ? '<a class="small-link" href="' + r.google_meet_link + '" target="_blank" rel="noopener noreferrer">Ссылка на встречу</a>'
+            : '';
           node.innerHTML = [
             '<div class="request-head"><div class="request-title">' + selectionHtml + '<span class="pill">' + statusLabel + '</span> <strong>' + normalizeTopic(r.topic) + '</strong></div></div>',
             '<div class="small muted">' + formatDateRange(r.start_at, r.end_at) + '</div>',
+            meetLinkHtml ? ('<div class="small">' + meetLinkHtml + '</div>') : '',
             '<div class="actions"></div>'
           ].join('');
           const actions = node.querySelector('.actions');
