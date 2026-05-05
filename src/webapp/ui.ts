@@ -1,5 +1,3 @@
-import { getMiniAppConfig } from "../env";
-
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -10,9 +8,7 @@ function escapeHtml(value: string): string {
 }
 
 export function renderMiniAppHtml(): string {
-  const config = getMiniAppConfig();
   const appTitle = "NexaMeet";
-  const onboardingEnabled = config.onboardingEnabled ? "true" : "false";
 
   return `<!doctype html>
 <html lang="ru">
@@ -47,15 +43,15 @@ export function renderMiniAppHtml(): string {
       background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
       border: 1px solid var(--line);
       border-radius: 16px;
-      padding: 14px;
-      margin-bottom: 12px;
+      padding: 16px;
+      margin-bottom: 14px;
       box-shadow: 0 0 0 1px rgba(0,229,255,.06), 0 12px 34px rgba(0,0,0,.35);
     }
     h1 { font-size: 18px; margin: 0 0 8px; letter-spacing: .2px; }
     h2 { font-size: 15px; margin: 0 0 8px; color: var(--cyan); }
     .muted { color: var(--muted); font-size: 13px; }
-    .row { display: grid; gap: 8px; margin: 8px 0; }
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .row { display: grid; gap: 10px; margin: 10px 0; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     input, select, textarea, button {
       width: 100%;
       border-radius: 12px;
@@ -100,7 +96,7 @@ export function renderMiniAppHtml(): string {
       color: #9fd8ff;
       margin-right: 6px;
     }
-    .request { border: 1px solid #1b344a; border-radius: 12px; padding: 12px; margin: 8px 0; display: grid; gap: 8px; }
+    .request { border: 1px solid #1b344a; border-radius: 12px; padding: 13px; margin: 10px 0; display: grid; gap: 10px; }
     .request-head { min-height: 52px; display: grid; align-content: start; gap: 4px; }
     .request-title { line-height: 1.3; display: grid; gap: 4px; }
     .request-title strong { font-size: 17px; }
@@ -347,17 +343,32 @@ export function renderMiniAppHtml(): string {
     .slot-time { color: #7af4ff; font-weight: 700; }
     .wizard-step { display: none; }
     .wizard-step.active { display: block; }
+    .wizard-step.active.step-review { display: grid; gap: 10px; }
     .wizard-nav { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
     .wizard-nav .primary { grid-column: span 3; }
     .wizard-head { font-weight: 700; color: #cfe8ff; margin-bottom: 8px; }
     .wizard-summary { display: grid; gap: 6px; border: 1px solid #214661; border-radius: 10px; padding: 10px; background: rgba(9,19,32,.5); }
     .wizard-summary div { font-size: 13px; color: #c7ddf0; }
+    .review-note {
+      border: 1px solid #1f4f6f;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(8, 20, 35, .55);
+      color: #b9d2e6;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .wizard-edit-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
     .wizard-submit-wrap {
       position: sticky;
-      bottom: 0;
+      bottom: max(10px, env(safe-area-inset-bottom));
       background: linear-gradient(180deg, rgba(5,7,10,.15), rgba(5,7,10,.92));
       padding-top: 8px;
-      margin-top: 8px;
+      margin-top: 4px;
     }
     .admin-menu { display: grid; gap: 8px; margin: 10px 0; }
     .admin-menu button { text-align: left; }
@@ -428,7 +439,6 @@ export function renderMiniAppHtml(): string {
   <!-- miniapp-build: modal-v2 -->
   <div class="wrap">
     <div class="card">
-      <h1>${escapeHtml(appTitle)}</h1>
       <div id="status" class="muted">Подключение...</div>
     </div>
     <div id="loadingPanel" class="card loading-panel">
@@ -436,15 +446,6 @@ export function renderMiniAppHtml(): string {
       <div class="skeleton md"></div>
       <div class="skeleton md"></div>
       <div class="skeleton sm"></div>
-    </div>
-
-    <div id="onboarding" class="card hidden">
-      <h2>Быстрый старт</h2>
-      <div class="muted">Создавайте и управляйте заявками в 2-3 нажатия.</div>
-      <div class="row">
-        <button id="btnAddHome" class="lime">Добавить на главный экран</button>
-        <button id="btnCloseOnboarding">Понятно</button>
-      </div>
     </div>
 
     <div id="appRoot" class="hidden">
@@ -456,7 +457,6 @@ export function renderMiniAppHtml(): string {
       </div>
 
       <section id="tab-home" class="card">
-        <h2>Главная</h2>
         <div id="profileBlock" class="muted"></div>
       </section>
 
@@ -508,11 +508,15 @@ export function renderMiniAppHtml(): string {
           </div>
           <label>Email <input id="fEmail" type="email" /></label>
         </div>
-        <div id="newStep8" class="wizard-step row">
+        <div id="newStep8" class="wizard-step row step-review">
+          <div id="newSummaryFinal" class="wizard-summary"></div>
+          <div class="review-note">Проверьте информацию перед отправкой. Если нужно изменить данные, нажмите «Подкорректировать».</div>
+          <div class="wizard-edit-row">
+            <button id="btnEditBeforeSubmit">Подкорректировать</button>
+          </div>
           <div class="wizard-submit-wrap">
             <button id="btnSubmitRequest" class="primary">Отправить заявку</button>
           </div>
-          <div id="newRequestHint" class="muted">Проверьте данные и отправьте заявку.</div>
         </div>
         <div class="wizard-nav">
           <button id="btnWizardBack">Назад</button>
@@ -668,9 +672,6 @@ export function renderMiniAppHtml(): string {
         status: document.getElementById('status'),
         loadingPanel: document.getElementById('loadingPanel'),
         appRoot: document.getElementById('appRoot'),
-        onboarding: document.getElementById('onboarding'),
-        btnAddHome: document.getElementById('btnAddHome'),
-        btnCloseOnboarding: document.getElementById('btnCloseOnboarding'),
         tabAdmin: document.getElementById('tabAdmin'),
         profileBlock: document.getElementById('profileBlock'),
         newWizardHead: document.getElementById('newWizardHead'),
@@ -685,7 +686,9 @@ export function renderMiniAppHtml(): string {
         btnWizardBack: document.getElementById('btnWizardBack'),
         btnWizardNext: document.getElementById('btnWizardNext'),
         btnWizardExit: document.getElementById('btnWizardExit'),
+        btnEditBeforeSubmit: document.getElementById('btnEditBeforeSubmit'),
         newSummary: document.getElementById('newSummary'),
+        newSummaryFinal: document.getElementById('newSummaryFinal'),
         myRequests: document.getElementById('myRequests'),
         myStatusFilters: document.getElementById('myStatusFilters'),
         adminStatusFilters: document.getElementById('adminStatusFilters'),
@@ -703,7 +706,6 @@ export function renderMiniAppHtml(): string {
         fDescription: document.getElementById('fDescription'),
         fLocation: document.getElementById('fLocation'),
         btnSubmitRequest: document.getElementById('btnSubmitRequest'),
-        newRequestHint: document.getElementById('newRequestHint'),
         locationWrap: document.getElementById('locationWrap'),
         sStart: document.getElementById('sStart'),
         sEnd: document.getElementById('sEnd'),
@@ -1062,7 +1064,7 @@ export function renderMiniAppHtml(): string {
       function renderWizardSummary() {
         const slot = selectedSlotIndex === null ? null : slotsCache[selectedSlotIndex];
         const when = slot ? formatDateRange(slot.start_at, slot.end_at) : 'не выбрано';
-        els.newSummary.innerHTML = [
+        const summaryHtml = [
           '<div><strong>Тема:</strong> ' + escapeHtml(els.fTopic.value || '-') + '</div>',
           '<div><strong>Комментарий:</strong> ' + escapeHtml(els.fDescription.value || '-') + '</div>',
           '<div><strong>Длительность:</strong> ' + escapeHtml(els.fDuration.value || '-') + ' мин</div>',
@@ -1070,6 +1072,8 @@ export function renderMiniAppHtml(): string {
           '<div><strong>Когда:</strong> ' + escapeHtml(when) + '</div>',
           '<div><strong>Email:</strong> ' + escapeHtml(els.fEmail.value || '-') + '</div>'
         ].join('');
+        els.newSummary.innerHTML = summaryHtml;
+        if (els.newSummaryFinal) els.newSummaryFinal.innerHTML = summaryHtml;
       }
 
       function updateWizardUi() {
@@ -1503,9 +1507,9 @@ export function renderMiniAppHtml(): string {
         role = data.role;
 
         const user = data.user || {};
+        const userName = [user.first_name || '', user.last_name || ''].join(' ').trim() || 'друг';
         els.profileBlock.innerHTML = [
-          '<div><strong>' + (user.first_name || '-') + ' ' + (user.last_name || '') + '</strong></div>',
-          '<div class="muted">@' + (user.username || '-') + ' / роль: ' + (role === 'admin' ? 'админ' : 'пользователь') + '</div>',
+          '<div><strong>Привет, ' + escapeHtml(userName) + '!</strong></div>',
           '<div class="hero">' +
             '<div class="hero-intro">' +
               '<img class="hero-photo" id="heroPhoto" src="/miniapp/assets/home-photo.jpeg" alt="Фото консультанта" />' +
@@ -1519,20 +1523,8 @@ export function renderMiniAppHtml(): string {
               '<li>Отслеживайте статус заявки в одном месте.</li>' +
               '<li>Консультации: AI-вайбкодинг и финансовое планирование с ИИ.</li>' +
             '</ul>' +
-            '<div class="hero-quick">' +
-              '<button id="homeGoNew" type="button"><strong>Новая заявка</strong><span>Записаться на консультацию</span></button>' +
-              '<button id="homeGoMy" type="button"><strong>Мои заявки</strong><span>Проверить статусы и действия</span></button>' +
-            '</div>' +
           '</div>'
         ].join('');
-
-        const homeGoNew = document.getElementById('homeGoNew');
-        if (homeGoNew) homeGoNew.addEventListener('click', () => switchTab('new'));
-        const homeGoMy = document.getElementById('homeGoMy');
-        if (homeGoMy) homeGoMy.addEventListener('click', async () => {
-          switchTab('my');
-          await loadMyRequests();
-        });
         const heroPhoto = document.getElementById('heroPhoto');
         if (heroPhoto) {
           heroPhoto.addEventListener('error', () => {
@@ -1550,10 +1542,6 @@ export function renderMiniAppHtml(): string {
         if (role === 'admin') {
           els.tabAdmin.classList.remove('hidden');
           renderAdminTemplatePreview();
-        }
-
-        if (${onboardingEnabled} && localStorage.getItem('miniapp_onboarding_done') !== '1') {
-          els.onboarding.classList.remove('hidden');
         }
 
         els.fFirstName.value = user.first_name || '';
@@ -1740,6 +1728,12 @@ export function renderMiniAppHtml(): string {
         wizardStep = Math.min(8, wizardStep + 1);
         updateWizardUi();
       });
+      if (els.btnEditBeforeSubmit) {
+        els.btnEditBeforeSubmit.addEventListener('click', () => {
+          wizardStep = 7;
+          updateWizardUi();
+        });
+      }
 
       document.getElementById('btnSubmitRequest').addEventListener('click', async () => {
         const slot = selectedSlotIndex === null ? null : slotsCache[selectedSlotIndex];
@@ -1879,17 +1873,6 @@ export function renderMiniAppHtml(): string {
       });
       document.getElementById('btnReloadOAuthStatus').addEventListener('click', async () => {
         await loadGoogleOAuthStatus();
-      });
-
-      els.btnCloseOnboarding.addEventListener('click', () => {
-        els.onboarding.classList.add('hidden');
-        localStorage.setItem('miniapp_onboarding_done', '1');
-      });
-
-      els.btnAddHome.addEventListener('click', () => {
-        if (tg && typeof tg.addToHomeScreen === 'function') {
-          try { tg.addToHomeScreen(); } catch {}
-        }
       });
 
       function closeReplyModal(payload) {
