@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createGoogleCalendarAvailabilityProvider = createGoogleCalendarAvailabilityProvider;
 exports.createGoogleCalendarEventSyncProvider = createGoogleCalendarEventSyncProvider;
+exports.getGoogleOAuthStatus = getGoogleOAuthStatus;
 const googleapis_1 = require("googleapis");
 const env_1 = require("../env");
 const logger_1 = require("../logger");
@@ -280,4 +281,56 @@ function createGoogleCalendarEventSyncProvider() {
             }
         }
     };
+}
+async function getGoogleOAuthStatus() {
+    const config = (0, env_1.getGoogleCalendarConfig)();
+    if (!config.enabled || !config.clientId || !config.clientSecret || !config.refreshToken) {
+        return {
+            connected: false,
+            calendarId: config.calendarId ?? null,
+            errorCode: "GOOGLE_CONFIG_INCOMPLETE",
+            errorMessage: "Заполните GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REFRESH_TOKEN"
+        };
+    }
+    try {
+        const oauth2Client = new googleapis_1.google.auth.OAuth2(config.clientId, config.clientSecret);
+        oauth2Client.setCredentials({ refresh_token: config.refreshToken });
+        const accessToken = await oauth2Client.getAccessToken();
+        const token = typeof accessToken === "string"
+            ? accessToken
+            : typeof accessToken?.token === "string"
+                ? accessToken.token
+                : null;
+        if (!token) {
+            return {
+                connected: false,
+                calendarId: config.calendarId,
+                errorCode: "GOOGLE_ACCESS_TOKEN_MISSING",
+                errorMessage: "Google OAuth не вернул access token"
+            };
+        }
+        const calendar = googleapis_1.google.calendar({ version: "v3", auth: oauth2Client });
+        await calendar.freebusy.query({
+            requestBody: {
+                timeMin: new Date().toISOString(),
+                timeMax: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+                timeZone: "Europe/Moscow",
+                items: [{ id: config.calendarId }]
+            }
+        });
+        return {
+            connected: true,
+            calendarId: config.calendarId,
+            errorCode: null,
+            errorMessage: null
+        };
+    }
+    catch (error) {
+        return {
+            connected: false,
+            calendarId: config.calendarId,
+            errorCode: "GOOGLE_OAUTH_CHECK_FAILED",
+            errorMessage: normalizeErrorMessage(error)
+        };
+    }
 }

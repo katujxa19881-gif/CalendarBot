@@ -63,7 +63,8 @@ function createTelegramAdminNotifier(botToken) {
                 },
                 body: JSON.stringify({
                     chat_id: input.chatId,
-                    text: input.text
+                    text: input.text,
+                    reply_markup: input.replyMarkup
                 })
             });
             if (!response.ok) {
@@ -363,7 +364,15 @@ async function processApprovalReminderJob(job, deps) {
     lines.push(`Дата и время: ${formatDateRangeMoscow(request.startAt, request.endAt)}`);
     await deps.adminNotifier.sendMessage({
         chatId: deps.adminTelegramId,
-        text: lines.join("\n")
+        text: lines.join("\n"),
+        replyMarkup: {
+            inline_keyboard: [
+                [
+                    { text: "Подтвердить", callback_data: `approval:confirm:${request.id}` },
+                    { text: "Отклонить", callback_data: `approval:reject:${request.id}` }
+                ]
+            ]
+        }
     });
     (0, logger_1.logEvent)({
         operation: "reminder_sent",
