@@ -43,15 +43,15 @@ export function renderMiniAppHtml(): string {
       background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
       border: 1px solid var(--line);
       border-radius: 16px;
-      padding: 16px;
-      margin-bottom: 14px;
+      padding: 18px;
+      margin-bottom: 16px;
       box-shadow: 0 0 0 1px rgba(0,229,255,.06), 0 12px 34px rgba(0,0,0,.35);
     }
     h1 { font-size: 18px; margin: 0 0 8px; letter-spacing: .2px; }
-    h2 { font-size: 15px; margin: 0 0 8px; color: var(--cyan); }
+    h2 { font-size: 15px; margin: 0 0 12px; color: var(--cyan); }
     .muted { color: var(--muted); font-size: 13px; }
-    .row { display: grid; gap: 10px; margin: 10px 0; }
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .row { display: grid; gap: 14px; margin: 14px 0; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
     .row > label,
     .grid2 > label {
       display: grid;
@@ -63,7 +63,7 @@ export function renderMiniAppHtml(): string {
       border: 1px solid #204463;
       background: #0b1627;
       color: var(--text);
-      padding: 11px 12px;
+      padding: 12px 14px;
       font-size: 14px;
     }
     textarea { min-height: 90px; resize: vertical; }
@@ -88,8 +88,8 @@ export function renderMiniAppHtml(): string {
       border-color: #7f3341;
       color: #ffacb3;
     }
-    .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
-    .tabs button { font-size: 13px; padding: 9px; }
+    .tabs { display: flex; gap: 10px; margin-bottom: 14px; }
+    .tabs button { font-size: 13px; padding: 10px 12px; }
     .tabs button.active { border-color: var(--cyan); box-shadow: 0 0 0 1px rgba(0,229,255,.35) inset; }
     .hidden { display: none !important; }
     .pill {
@@ -101,12 +101,12 @@ export function renderMiniAppHtml(): string {
       color: #9fd8ff;
       margin-right: 6px;
     }
-    .request { border: 1px solid #1b344a; border-radius: 12px; padding: 13px; margin: 10px 0; display: grid; gap: 10px; }
+    .request { border: 1px solid #1b344a; border-radius: 12px; padding: 14px; margin: 12px 0; display: grid; gap: 12px; }
     .request-head { min-height: 52px; display: grid; align-content: start; gap: 4px; }
     .request-title { line-height: 1.3; display: grid; gap: 4px; }
     .request-title strong { font-size: 17px; }
     .request-select { margin-right: 8px; transform: translateY(1px); width: 16px; height: 16px; accent-color: var(--cyan); }
-    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
     .actions button { min-height: 46px; font-weight: 600; }
     .actions button.ghost {
       opacity: .38;
@@ -349,9 +349,9 @@ export function renderMiniAppHtml(): string {
     .wizard-step { display: none; }
     .wizard-step.active { display: block; }
     .wizard-step.active.step-review { display: grid; gap: 10px; }
-    .wizard-nav { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 14px; }
+    .wizard-nav { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 16px; }
     .wizard-nav .primary { grid-column: span 3; }
-    .wizard-head { font-weight: 700; color: #cfe8ff; margin-bottom: 8px; }
+    .wizard-head { font-weight: 700; color: #cfe8ff; margin-bottom: 12px; line-height: 1.4; }
     .wizard-summary { display: grid; gap: 6px; border: 1px solid #214661; border-radius: 10px; padding: 10px; background: rgba(9,19,32,.5); }
     .wizard-summary div { font-size: 13px; color: #c7ddf0; line-height: 1.5; }
     .review-note {
@@ -674,6 +674,7 @@ export function renderMiniAppHtml(): string {
         loadingPanel: document.getElementById('loadingPanel'),
         appRoot: document.getElementById('appRoot'),
         tabAdmin: document.getElementById('tabAdmin'),
+        tabHomeBtn: document.querySelector('.tabs button[data-tab="home"]'),
         profileBlock: document.getElementById('profileBlock'),
         newWizardHead: document.getElementById('newWizardHead'),
         newStep1: document.getElementById('newStep1'),
@@ -1027,6 +1028,9 @@ export function renderMiniAppHtml(): string {
           if (!el) return;
           el.classList.toggle('hidden', t !== tab);
         });
+        if (els.tabHomeBtn) {
+          els.tabHomeBtn.classList.toggle('hidden', tab === 'home');
+        }
         localStorage.setItem('miniapp_last_tab', tab);
       }
 
