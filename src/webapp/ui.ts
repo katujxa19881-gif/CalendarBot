@@ -448,16 +448,6 @@ export function renderMiniAppHtml(): string {
       grid-template-columns: 1fr 1fr;
       gap: 8px;
     }
-    .quick-edit-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-    }
-    .quick-edit-grid button {
-      font-size: 12px;
-      padding: 8px 10px;
-      min-height: 40px;
-    }
     .wizard-submit-wrap {
       position: sticky;
       bottom: max(10px, env(safe-area-inset-bottom));
@@ -604,14 +594,6 @@ export function renderMiniAppHtml(): string {
         <div id="newStep8" class="wizard-step row step-review">
           <div id="newSummaryFinal" class="wizard-summary"></div>
           <div class="review-note">Проверьте информацию перед отправкой. Если нужно изменить данные, нажмите «Подкорректировать».</div>
-          <div class="quick-edit-grid">
-            <button id="btnEditTopic" type="button">Изменить тему</button>
-            <button id="btnEditDescription" type="button">Изменить комментарий</button>
-            <button id="btnEditDuration" type="button">Изменить длительность</button>
-            <button id="btnEditFormat" type="button">Изменить формат</button>
-            <button id="btnEditSlot" type="button">Изменить слот</button>
-            <button id="btnEditEmail" type="button">Изменить email</button>
-          </div>
           <div class="wizard-edit-row">
             <button id="btnEditBeforeSubmit">Подкорректировать</button>
           </div>
@@ -828,12 +810,6 @@ export function renderMiniAppHtml(): string {
         qeEmail: document.getElementById('qeEmail'),
         btnQuickEditCancel: document.getElementById('btnQuickEditCancel'),
         btnQuickEditApply: document.getElementById('btnQuickEditApply'),
-        btnEditTopic: document.getElementById('btnEditTopic'),
-        btnEditDescription: document.getElementById('btnEditDescription'),
-        btnEditDuration: document.getElementById('btnEditDuration'),
-        btnEditFormat: document.getElementById('btnEditFormat'),
-        btnEditSlot: document.getElementById('btnEditSlot'),
-        btnEditEmail: document.getElementById('btnEditEmail'),
         btnOpenNewFromMy: document.getElementById('btnOpenNewFromMy'),
         btnOpenAdminFromMy: document.getElementById('btnOpenAdminFromMy'),
         newSummary: document.getElementById('newSummary'),
@@ -900,6 +876,7 @@ export function renderMiniAppHtml(): string {
 
       let token = null;
       let role = 'user';
+      let reviewJumpBackToStep8 = false;
       let slotsCache = [];
       let selectedSlotIndex = null;
       let selectedWeekId = null;
@@ -1935,10 +1912,12 @@ export function renderMiniAppHtml(): string {
       });
 
       els.btnWizardBack.addEventListener('click', () => {
+        reviewJumpBackToStep8 = false;
         wizardStep = Math.max(1, wizardStep - 1);
         updateWizardUi();
       });
       els.btnWizardExit.addEventListener('click', () => {
+        reviewJumpBackToStep8 = false;
         wizardStep = 1;
         switchTab('home');
         updateWizardUi();
@@ -1954,6 +1933,15 @@ export function renderMiniAppHtml(): string {
         }
         if (wizardStep === 3 && !slotsCache.length) {
           await document.getElementById('btnLoadSlots').click();
+        }
+        if (reviewJumpBackToStep8 && wizardStep < 8) {
+          if (wizardStep === 3 || wizardStep === 4 || wizardStep === 5 || wizardStep === 6) {
+            reviewJumpBackToStep8 = false;
+          } else {
+            wizardStep = 8;
+            updateWizardUi();
+            return;
+          }
         }
         wizardStep = Math.min(8, wizardStep + 1);
         updateWizardUi();
@@ -1981,38 +1969,6 @@ export function renderMiniAppHtml(): string {
           showToast('Изменения применены', 'ok');
         });
       }
-      if (els.btnEditTopic) {
-        els.btnEditTopic.addEventListener('click', () => {
-          wizardStep = 1;
-          updateWizardUi();
-        });
-      }
-      if (els.btnEditDescription) {
-        els.btnEditDescription.addEventListener('click', () => {
-          wizardStep = 2;
-          updateWizardUi();
-        });
-      }
-      if (els.btnEditDuration || els.btnEditFormat) {
-        const goStep3 = () => {
-          wizardStep = 3;
-          updateWizardUi();
-        };
-        if (els.btnEditDuration) els.btnEditDuration.addEventListener('click', goStep3);
-        if (els.btnEditFormat) els.btnEditFormat.addEventListener('click', goStep3);
-      }
-      if (els.btnEditSlot) {
-        els.btnEditSlot.addEventListener('click', () => {
-          wizardStep = 4;
-          updateWizardUi();
-        });
-      }
-      if (els.btnEditEmail) {
-        els.btnEditEmail.addEventListener('click', () => {
-          wizardStep = 7;
-          updateWizardUi();
-        });
-      }
       if (els.newSummaryFinal) {
         els.newSummaryFinal.addEventListener('click', (event) => {
           const target = event.target;
@@ -2022,6 +1978,7 @@ export function renderMiniAppHtml(): string {
           const stepRaw = button.getAttribute('data-edit-step') || '';
           const step = Number(stepRaw);
           if (!Number.isFinite(step) || step < 1 || step > 7) return;
+          reviewJumpBackToStep8 = true;
           wizardStep = step;
           updateWizardUi();
         });
@@ -2064,6 +2021,7 @@ export function renderMiniAppHtml(): string {
           els.fTopic.value = '';
           els.fDescription.value = '';
           els.fLocation.value = '';
+          reviewJumpBackToStep8 = false;
           wizardStep = 1;
           updateWizardUi();
           showToast('Заявка отправлена', 'ok');

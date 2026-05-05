@@ -456,11 +456,9 @@ export async function cancelMeetingRequest(input: {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Calendar cancel failed";
-      if (isCalendarEventMissingLikeError(message)) {
-        calendarCancelWarning = message;
-      } else {
-        throw new WebAppOperationError("CALENDAR_SYNC_FAILED", message);
-      }
+      calendarCancelWarning = isCalendarEventMissingLikeError(message)
+        ? message
+        : `CALENDAR_CANCEL_SOFT_FAIL: ${message}`;
     }
   }
 
