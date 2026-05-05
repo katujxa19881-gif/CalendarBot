@@ -68,6 +68,24 @@ function normalizeErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown Google Calendar error";
 }
 
+function isGoogleNotFoundError(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const maybe = error as {
+    code?: unknown;
+    status?: unknown;
+    response?: { status?: unknown };
+    message?: unknown;
+  };
+  const status = maybe.status ?? maybe.response?.status;
+  if (status === 404 || maybe.code === 404) {
+    return true;
+  }
+  const message = typeof maybe.message === "string" ? maybe.message.toLowerCase() : "";
+  return message.includes("not found") || message.includes("404");
+}
+
 function parseBusyIntervals(input: unknown): BusyInterval[] {
   if (!Array.isArray(input)) {
     return [];
@@ -367,6 +385,21 @@ export function createGoogleCalendarEventSyncProvider(): CalendarEventSyncProvid
           sendUpdates: "all"
         });
       } catch (error) {
+        if (isGoogleNotFoundError(error)) {
+          logEvent({
+            level: "warn",
+            operation: "integration_error",
+            status: "error",
+            error_code: "GOOGLE_CALENDAR_EVENT_CANCEL_NOT_FOUND",
+            error_message: normalizeErrorMessage(error),
+            details: {
+              calendar_id: context.calendarId,
+              request_id: input.externalRequestId,
+              event_id: input.googleCalendarEventId
+            }
+          });
+          return;
+        }
         const errorMessage = normalizeErrorMessage(error);
 
         logEvent({

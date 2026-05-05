@@ -91,6 +91,12 @@ export function renderMiniAppHtml(): string {
     .tabs { display: flex; gap: 10px; margin-bottom: 14px; }
     .tabs button { font-size: 13px; padding: 10px 12px; }
     .tabs button.active { border-color: var(--cyan); box-shadow: 0 0 0 1px rgba(0,229,255,.35) inset; }
+    .greeting-banner {
+      font-size: 16px;
+      font-weight: 700;
+      color: #d8ecff;
+      margin-bottom: 2px;
+    }
     .hidden { display: none !important; }
     .pill {
       display: inline-block;
@@ -451,6 +457,9 @@ export function renderMiniAppHtml(): string {
     </div>
 
     <div id="appRoot" class="hidden">
+      <div id="greetingBannerCard" class="card hidden">
+        <div id="greetingBanner" class="greeting-banner"></div>
+      </div>
       <div class="tabs card">
         <button data-tab="home" class="active">Главная</button>
         <button data-tab="new">Новая заявка</button>
@@ -673,6 +682,8 @@ export function renderMiniAppHtml(): string {
       const els = {
         loadingPanel: document.getElementById('loadingPanel'),
         appRoot: document.getElementById('appRoot'),
+        greetingBannerCard: document.getElementById('greetingBannerCard'),
+        greetingBanner: document.getElementById('greetingBanner'),
         tabAdmin: document.getElementById('tabAdmin'),
         tabHomeBtn: document.querySelector('.tabs button[data-tab="home"]'),
         profileBlock: document.getElementById('profileBlock'),
@@ -1520,8 +1531,11 @@ export function renderMiniAppHtml(): string {
 
         const user = data.user || {};
         const userName = [user.first_name || '', user.last_name || ''].join(' ').trim() || 'друг';
+        if (els.greetingBannerCard && els.greetingBanner) {
+          els.greetingBanner.textContent = 'Здравствуйте, ' + userName + '!';
+          els.greetingBannerCard.classList.remove('hidden');
+        }
         els.profileBlock.innerHTML = [
-          '<div><strong>Привет, ' + escapeHtml(userName) + '!</strong></div>',
           '<div class="hero">' +
             '<div class="hero-intro">' +
               '<img class="hero-photo" id="heroPhoto" src="/miniapp/assets/home-photo.jpeg" alt="Фото консультанта" />' +
