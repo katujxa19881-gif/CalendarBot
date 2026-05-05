@@ -1763,7 +1763,11 @@ export function renderMiniAppHtml(): string {
       bootstrap().catch((error) => {
         const message = error && error.message ? error.message : 'unknown';
         if (message === 'MINI_APP_BROWSER_AUTH_DISABLED') {
-          setStatus('Локальный доступ выключен: включи MINI_APP_BROWSER_AUTH_ENABLED=true', 'err');
+          setStatus('Откройте mini app из Telegram (кнопка бота). Веб-доступ без Telegram отключен.', 'err');
+          return;
+        }
+        if (message === 'MINI_APP_BROWSER_AUTH_FORBIDDEN') {
+          setStatus('Откройте mini app только внутри Telegram.', 'err');
           return;
         }
         setStatus('Ошибка: ' + message, 'err');

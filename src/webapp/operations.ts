@@ -100,7 +100,14 @@ function formatRequestCode(createdAt: Date): string {
   return `#${hh}${mm}`;
 }
 
-async function sendTelegramMessage(input: { chatId: string; text: string; meetLink?: string | null }): Promise<void> {
+async function sendTelegramMessage(input: {
+  chatId: string;
+  text: string;
+  meetLink?: string | null;
+  replyMarkup?: {
+    inline_keyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>>;
+  };
+}): Promise<void> {
   const { botToken } = getTelegramConfig();
   if (!botToken) {
     return;
@@ -115,7 +122,11 @@ async function sendTelegramMessage(input: { chatId: string; text: string; meetLi
       body: JSON.stringify({
         chat_id: input.chatId,
         text: input.text,
-        ...(input.meetLink
+        ...(input.replyMarkup
+          ? {
+              reply_markup: input.replyMarkup
+            }
+          : input.meetLink
           ? {
               reply_markup: {
                 inline_keyboard: [[{ text: "Открыть встречу", url: input.meetLink }]]
@@ -754,7 +765,15 @@ export async function submitMeetingRequestFromWebApp(input: {
     }
     await sendTelegramMessage({
       chatId: adminTelegramId,
-      text: lines.join("\n")
+      text: lines.join("\n"),
+      replyMarkup: {
+        inline_keyboard: [
+          [
+            { text: "Подтвердить", callback_data: `approval:confirm:${meetingRequest.id}` },
+            { text: "Отклонить", callback_data: `approval:reject:${meetingRequest.id}` }
+          ]
+        ]
+      }
     });
   }
 
