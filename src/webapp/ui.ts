@@ -897,6 +897,34 @@ export function renderMiniAppHtml(): string {
         });
       }
 
+      async function chooseRescheduleSlot(requestItem) {
+        const duration = Number(requestItem.duration_minutes || 30);
+        const data = await api(
+          '/api/webapp/slots?duration=' + duration + '&exclude_request_id=' + encodeURIComponent(requestItem.id)
+        );
+        const slots = Array.isArray(data.slots) ? data.slots : [];
+        if (!slots.length) {
+          showToast('Нет доступных слотов для переноса', 'err');
+          return null;
+        }
+
+        const options = slots.slice(0, 15).map((slot, idx) => {
+          return (idx + 1) + '. ' + formatDateRange(slot.start_at, slot.end_at);
+        });
+
+        const input = prompt(
+          'Выберите номер нового слота (1-' + options.length + '):\\n\\n' + options.join('\\n'),
+          '1'
+        );
+        if (input === null) return null;
+        const selected = Number(input.trim());
+        if (!Number.isFinite(selected) || selected < 1 || selected > options.length) {
+          showToast('Некорректный номер слота', 'err');
+          return null;
+        }
+        return slots[selected - 1];
+      }
+
       function switchTab(tab) {
         document.querySelectorAll('.tabs button[data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
         ['home','new','my','admin'].forEach((t) => {
@@ -1069,14 +1097,14 @@ export function renderMiniAppHtml(): string {
               const rsBtn = document.createElement('button');
               rsBtn.textContent = 'Перенести';
               rsBtn.onclick = async () => {
-                const start = prompt('Новый start_at ISO', r.start_at);
-                const end = prompt('Новый end_at ISO', r.end_at);
-                if (!start || !end) return;
+                const slot = await chooseRescheduleSlot(r);
+                if (!slot) return;
                 try {
                   await api('/api/webapp/requests/' + r.id + '/reschedule', {
                     method: 'POST',
-                    body: JSON.stringify({ start_at: start, end_at: end })
+                    body: JSON.stringify({ start_at: slot.start_at, end_at: slot.end_at })
                   });
+                  showToast('Заявка перенесена', 'ok');
                   await loadMyRequests();
                 } catch (error) {
                   showActionError(error);
@@ -1131,17 +1159,21 @@ export function renderMiniAppHtml(): string {
               {
                 text: 'Перенести',
                 className: '',
-                enabled: adminActionRules.canReschedule(r.status),
+                enabled: r.can_reschedule === true,
                 run: async () => {
-                  const start = prompt('Новый start_at ISO', r.start_at);
-                  const end = prompt('Новый end_at ISO', r.end_at);
-                  if (!start || !end) return;
+                  const slot = await chooseRescheduleSlot(r);
+                  if (!slot) return;
                   const reply = await chooseAdminReply('reschedule', r);
                   if (reply.cancelled) return;
                   await api('/api/webapp/admin/requests/' + r.id + '/reschedule', {
                     method: 'POST',
-                    body: JSON.stringify({ start_at: start, end_at: end, comment: reply.comment })
+                    body: JSON.stringify({
+                      start_at: slot.start_at,
+                      end_at: slot.end_at,
+                      comment: reply.comment
+                    })
                   });
+                  showToast('Заявка перенесена', 'ok');
                 }
               }
             ];
