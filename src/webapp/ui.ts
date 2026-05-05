@@ -1139,7 +1139,7 @@ export function renderMiniAppHtml(): string {
       }
 
       function canGoNext(step) {
-        if (step === 1) return Boolean((els.fTopic.value || '').trim());
+        if (step === 1) return (els.fTopic.value || '').trim().length >= 3;
         if (step === 3) return Boolean((els.fDuration.value || '').trim() && (els.fFormat.value || '').trim());
         if (step === 4) return Boolean(selectedWeekId);
         if (step === 5) return Boolean(selectedDayKey);
@@ -1800,6 +1800,10 @@ export function renderMiniAppHtml(): string {
       });
       els.btnWizardNext.addEventListener('click', async () => {
         if (!canGoNext(wizardStep)) {
+          if (wizardStep === 1) {
+            showToast('Тема должна быть не короче 3 символов', 'err');
+            return;
+          }
           showToast('Заполните текущий шаг', 'err');
           return;
         }
@@ -1822,37 +1826,45 @@ export function renderMiniAppHtml(): string {
           showToast('Сначала выберите слот', 'err');
           return;
         }
-        await api('/api/webapp/requests', {
-          method: 'POST',
-          body: JSON.stringify({
-            duration_minutes: Number(els.fDuration.value || 30),
-            format: els.fFormat.value,
-            start_at: slot.start_at,
-            end_at: slot.end_at,
-            topic: els.fTopic.value,
-            description: els.fDescription.value || null,
-            email: els.fEmail.value,
-            first_name: els.fFirstName.value,
-            last_name: els.fLastName.value,
-            location: els.fFormat.value === 'OFFLINE' ? (els.fLocation.value || null) : null
-          })
-        });
-        clearRequestCaches();
-        selectedSlotIndex = null;
-        selectedWeekId = null;
-        selectedDayKey = null;
-        slotsCache = [];
-        els.fWeekList.innerHTML = '<div class="muted">Сначала нажмите кнопку выше.</div>';
-        els.fDayList.innerHTML = '<div class="muted">Выберите неделю.</div>';
-        els.fTimeList.innerHTML = '<div class="muted">Выберите день.</div>';
-        els.fTopic.value = '';
-        els.fDescription.value = '';
-        els.fLocation.value = '';
-        wizardStep = 1;
-        updateWizardUi();
-        showToast('Заявка отправлена', 'ok');
-        switchTab('my');
-        await loadMyRequests();
+        if ((els.fTopic.value || '').trim().length < 3) {
+          showToast('Тема должна быть не короче 3 символов', 'err');
+          return;
+        }
+        try {
+          await api('/api/webapp/requests', {
+            method: 'POST',
+            body: JSON.stringify({
+              duration_minutes: Number(els.fDuration.value || 30),
+              format: els.fFormat.value,
+              start_at: slot.start_at,
+              end_at: slot.end_at,
+              topic: els.fTopic.value,
+              description: els.fDescription.value || null,
+              email: els.fEmail.value,
+              first_name: els.fFirstName.value,
+              last_name: els.fLastName.value,
+              location: els.fFormat.value === 'OFFLINE' ? (els.fLocation.value || null) : null
+            })
+          });
+          clearRequestCaches();
+          selectedSlotIndex = null;
+          selectedWeekId = null;
+          selectedDayKey = null;
+          slotsCache = [];
+          els.fWeekList.innerHTML = '<div class="muted">Сначала нажмите кнопку выше.</div>';
+          els.fDayList.innerHTML = '<div class="muted">Выберите неделю.</div>';
+          els.fTimeList.innerHTML = '<div class="muted">Выберите день.</div>';
+          els.fTopic.value = '';
+          els.fDescription.value = '';
+          els.fLocation.value = '';
+          wizardStep = 1;
+          updateWizardUi();
+          showToast('Заявка отправлена', 'ok');
+          switchTab('my');
+          await loadMyRequests();
+        } catch (error) {
+          showActionError(error);
+        }
       });
 
       document.getElementById('btnReloadMy').addEventListener('click', () => loadMyRequests());
@@ -1897,7 +1909,17 @@ export function renderMiniAppHtml(): string {
       });
       document.getElementById('btnClearSelected').addEventListener('click', async () => {
         if (!adminSelectedRequestIds.size) {
-          showToast('Нет выбранных заявок для очистки', 'err');
+          const data = await api('/api/webapp/admin/requests?limit=100');
+          const requests = data.requests || [];
+          adminSelectedRequestIds = new Set(
+            requests.filter((r) => MANUAL_CLEAN_STATUSES.has(String(r.status || ''))).map((r) => r.id)
+          );
+          if (!adminSelectedRequestIds.size) {
+            showToast('Нет закрытых заявок для очистки', 'err');
+            return;
+          }
+          showToast('Выбраны закрытые заявки: ' + adminSelectedRequestIds.size, 'ok');
+          await loadAdminRequests();
           return;
         }
         if (!confirm('Удалить выбранные закрытые заявки без возможности восстановления?')) return;
