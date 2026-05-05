@@ -593,8 +593,8 @@ export function renderMiniAppHtml(): string {
       let selectedSlotIndex = null;
       let replyModalResolver = null;
       let adminSelectedRequestIds = new Set();
-      let myStatusFilter = 'ALL';
-      let adminStatusFilter = '';
+      let myStatusFilter = localStorage.getItem('miniapp_my_status_filter') || 'ALL';
+      let adminStatusFilter = localStorage.getItem('miniapp_admin_status_filter') || '';
 
       const statusLabels = {
         NEW: 'Новая',
@@ -1159,6 +1159,15 @@ export function renderMiniAppHtml(): string {
         els.fEmail.value = '';
         els.fTopic.value = '';
         updateNewRequestProgress();
+        els.myStatusFilters.querySelectorAll('button[data-my-filter]').forEach((node) => {
+          const value = node.getAttribute('data-my-filter') || 'ALL';
+          node.classList.toggle('active', value === myStatusFilter);
+        });
+        els.adminStatusFilters.querySelectorAll('button[data-admin-filter]').forEach((node) => {
+          const value = node.getAttribute('data-admin-filter') || '';
+          node.classList.toggle('active', value === adminStatusFilter);
+        });
+        els.aStatus.value = adminStatusFilter;
 
         await loadMyRequests();
 
@@ -1309,6 +1318,7 @@ export function renderMiniAppHtml(): string {
       els.myStatusFilters.querySelectorAll('button[data-my-filter]').forEach((btn) => {
         btn.addEventListener('click', async () => {
           myStatusFilter = btn.getAttribute('data-my-filter') || 'ALL';
+          localStorage.setItem('miniapp_my_status_filter', myStatusFilter);
           els.myStatusFilters.querySelectorAll('button[data-my-filter]').forEach((node) => {
             node.classList.toggle('active', node === btn);
           });
@@ -1318,6 +1328,7 @@ export function renderMiniAppHtml(): string {
       els.adminStatusFilters.querySelectorAll('button[data-admin-filter]').forEach((btn) => {
         btn.addEventListener('click', async () => {
           adminStatusFilter = btn.getAttribute('data-admin-filter') || '';
+          localStorage.setItem('miniapp_admin_status_filter', adminStatusFilter);
           els.aStatus.value = adminStatusFilter;
           els.adminStatusFilters.querySelectorAll('button[data-admin-filter]').forEach((node) => {
             node.classList.toggle('active', node === btn);
@@ -1327,6 +1338,7 @@ export function renderMiniAppHtml(): string {
       });
       els.aStatus.addEventListener('change', async () => {
         adminStatusFilter = (els.aStatus.value || '').trim();
+        localStorage.setItem('miniapp_admin_status_filter', adminStatusFilter);
         els.adminStatusFilters.querySelectorAll('button[data-admin-filter]').forEach((node) => {
           const value = node.getAttribute('data-admin-filter') || '';
           node.classList.toggle('active', value === adminStatusFilter);
