@@ -76,6 +76,7 @@ const patchSettingsBodySchema = z
   .object({
     workday_start_hour: z.number().int().optional(),
     workday_end_hour: z.number().int().optional(),
+    workdays: z.array(z.number().int().min(1).max(7)).max(7).optional(),
     slot_limit: z.number().int().optional(),
     slot_buffer_minutes: z.number().int().optional(),
     slot_min_lead_hours: z.number().int().optional(),
@@ -1135,6 +1136,7 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
       settings: {
         workday_start_hour: settings.workdayStartHour,
         workday_end_hour: settings.workdayEndHour,
+        workdays: settings.workdays,
         slot_limit: settings.slotLimit,
         slot_buffer_minutes: settings.slotBufferMinutes,
         slot_min_lead_hours: settings.slotMinLeadHours,
@@ -1170,6 +1172,7 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
         patch: {
           workdayStartHour: parsedBody.data.workday_start_hour,
           workdayEndHour: parsedBody.data.workday_end_hour,
+          workdays: parsedBody.data.workdays,
           slotLimit: parsedBody.data.slot_limit,
           slotBufferMinutes: parsedBody.data.slot_buffer_minutes,
           slotMinLeadHours: parsedBody.data.slot_min_lead_hours,
@@ -1182,6 +1185,7 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
         settings: {
           workday_start_hour: updated.workdayStartHour,
           workday_end_hour: updated.workdayEndHour,
+          workdays: updated.workdays,
           slot_limit: updated.slotLimit,
           slot_buffer_minutes: updated.slotBufferMinutes,
           slot_min_lead_hours: updated.slotMinLeadHours,

@@ -633,6 +633,7 @@ export async function patchMeetingSettingsByAdmin(input: {
   patch: {
     workdayStartHour?: number;
     workdayEndHour?: number;
+    workdays?: number[];
     slotLimit?: number;
     slotBufferMinutes?: number;
     slotMinLeadHours?: number;

@@ -4,6 +4,7 @@ import { prisma } from "../db";
 export type MeetingSettings = {
   workdayStartHour: number;
   workdayEndHour: number;
+  workdays: number[];
   slotLimit: number;
   slotBufferMinutes: number;
   slotMinLeadHours: number;
@@ -22,10 +23,17 @@ function clampInt(value: number, min: number, max: number): number {
 function normalize(input: AppSettings): MeetingSettings {
   const startHour = clampInt(input.workdayStartHour, 6, 21);
   const endHour = clampInt(input.workdayEndHour, startHour + 1, 23);
+  const parsedWorkdays = String(input.workdays ?? "")
+    .split(",")
+    .map((item) => Number(item.trim()))
+    .filter((value) => Number.isInteger(value) && value >= 1 && value <= 7);
+  const uniqueWorkdays = [...new Set(parsedWorkdays)].sort((a, b) => a - b);
+  const workdays = uniqueWorkdays.length > 0 ? uniqueWorkdays : [1, 2, 3, 4, 5];
 
   return {
     workdayStartHour: startHour,
     workdayEndHour: endHour,
+    workdays,
     slotLimit: clampInt(input.slotLimit, 1, 30),
     slotBufferMinutes: clampInt(input.slotBufferMinutes, 0, 120),
     slotMinLeadHours: clampInt(input.slotMinLeadHours, 0, 72),
@@ -51,6 +59,12 @@ export async function patchMeetingSettings(patch: Partial<MeetingSettings>): Pro
   };
 
   const normalized = {
+    workdays:
+      (() => {
+        const normalizedDays = [...new Set((merged.workdays ?? []).map((d) => clampInt(d, 1, 7)))].sort((a, b) => a - b);
+        const safeDays = normalizedDays.length > 0 ? normalizedDays : [1, 2, 3, 4, 5];
+        return safeDays.join(",");
+      })(),
     workdayStartHour: clampInt(merged.workdayStartHour, 6, 21),
     workdayEndHour: clampInt(merged.workdayEndHour, clampInt(merged.workdayStartHour, 6, 21) + 1, 23),
     slotLimit: clampInt(merged.slotLimit, 1, 30),

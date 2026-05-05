@@ -213,9 +213,27 @@ export function renderMiniAppHtml(): string {
     }
     .hero-quick strong { display: block; margin-bottom: 2px; }
     .hero-quick span { color: var(--muted); font-size: 12px; }
+    .weekday-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .weekday-grid label {
+      border: 1px solid #214661;
+      border-radius: 10px;
+      padding: 7px 8px;
+      background: #0b1627;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .weekday-grid input { width: auto; margin: 0; accent-color: var(--cyan); }
     @media (max-width: 540px) {
       .hero-intro { grid-template-columns: 84px 1fr; }
       .hero-photo { width: 84px; height: 84px; }
+      .weekday-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     .modal-backdrop {
       position: fixed;
@@ -352,6 +370,16 @@ export function renderMiniAppHtml(): string {
           <label>Горизонт, дней <input id="sHorizon" type="number" /></label>
           <label>Опережение, ч <input id="sLead" type="number" /></label>
         </div>
+        <label>Рабочие дни недели</label>
+        <div class="weekday-grid" id="workdaysWrap">
+          <label><input type="checkbox" data-workday="1" />Пн</label>
+          <label><input type="checkbox" data-workday="2" />Вт</label>
+          <label><input type="checkbox" data-workday="3" />Ср</label>
+          <label><input type="checkbox" data-workday="4" />Чт</label>
+          <label><input type="checkbox" data-workday="5" />Пт</label>
+          <label><input type="checkbox" data-workday="6" />Сб</label>
+          <label><input type="checkbox" data-workday="7" />Вс</label>
+        </div>
         <div class="row">
           <button id="btnSaveSettings" class="lime">Сохранить настройки</button>
         </div>
@@ -442,6 +470,7 @@ export function renderMiniAppHtml(): string {
         sLimit: document.getElementById('sLimit'),
         sHorizon: document.getElementById('sHorizon'),
         sLead: document.getElementById('sLead'),
+        workdaysWrap: document.getElementById('workdaysWrap'),
         aStatus: document.getElementById('aStatus'),
         aFrom: document.getElementById('aFrom'),
         aTo: document.getElementById('aTo'),
@@ -887,6 +916,12 @@ export function renderMiniAppHtml(): string {
         els.sLimit.value = s.slot_limit;
         els.sHorizon.value = s.slot_horizon_days;
         els.sLead.value = s.slot_min_lead_hours;
+        const selectedWorkdays = new Set(Array.isArray(s.workdays) ? s.workdays : [1, 2, 3, 4, 5]);
+        els.workdaysWrap.querySelectorAll('input[data-workday]').forEach((node) => {
+          const checkbox = node;
+          const day = Number(checkbox.getAttribute('data-workday'));
+          checkbox.checked = selectedWorkdays.has(day);
+        });
       }
 
       async function bootstrap() {
@@ -1101,11 +1136,22 @@ export function renderMiniAppHtml(): string {
       });
 
       document.getElementById('btnSaveSettings').addEventListener('click', async () => {
+        const workdays = [];
+        els.workdaysWrap.querySelectorAll('input[data-workday]').forEach((node) => {
+          if (node.checked) {
+            workdays.push(Number(node.getAttribute('data-workday')));
+          }
+        });
+        if (!workdays.length) {
+          alert('Выберите хотя бы один рабочий день');
+          return;
+        }
         await api('/api/webapp/admin/settings', {
           method: 'PATCH',
           body: JSON.stringify({
             workday_start_hour: Number(els.sStart.value),
             workday_end_hour: Number(els.sEnd.value),
+            workdays,
             slot_buffer_minutes: Number(els.sBuffer.value),
             slot_limit: Number(els.sLimit.value),
             slot_horizon_days: Number(els.sHorizon.value),

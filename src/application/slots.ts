@@ -87,9 +87,9 @@ function buildCandidateSlots(durationMinutes: number, settings: MeetingSettings)
   for (let dayOffset = 0; dayOffset <= settings.slotHorizonDays; dayOffset += 1) {
     const dayStartUtc = fromMoscowPartsToUtcDate(baseYear, baseMonth, baseDay + dayOffset, 0, 0);
     const dayMoscow = toMoscowDate(dayStartUtc);
-    const dayOfWeek = dayMoscow.getUTCDay();
-
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
+    const dayOfWeekJs = dayMoscow.getUTCDay(); // 0=Sun..6=Sat
+    const dayOfWeek = dayOfWeekJs === 0 ? 7 : dayOfWeekJs; // 1=Mon..7=Sun
+    if (!settings.workdays.includes(dayOfWeek)) {
       continue;
     }
 
