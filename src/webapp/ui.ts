@@ -88,9 +88,30 @@ export function renderMiniAppHtml(): string {
       border-color: #7f3341;
       color: #ffacb3;
     }
-    .tabs { display: flex; gap: 10px; margin-bottom: 14px; }
-    .tabs button { font-size: 13px; padding: 10px 12px; }
-    .tabs button.active { border-color: var(--cyan); box-shadow: 0 0 0 1px rgba(0,229,255,.35) inset; }
+    .compact-nav {
+      position: sticky;
+      top: max(8px, env(safe-area-inset-top));
+      z-index: 20;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 10px;
+    }
+    .compact-nav button {
+      width: auto;
+      min-width: 108px;
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(10, 22, 36, .92);
+      border-color: #2a5978;
+    }
+    .compact-nav .current {
+      margin-left: auto;
+      font-size: 12px;
+      color: #99b9d1;
+      padding-right: 4px;
+    }
     .greeting-banner {
       font-size: 16px;
       font-weight: 700;
@@ -231,7 +252,7 @@ export function renderMiniAppHtml(): string {
     .hero-quick {
       margin-top: 12px;
       display: grid;
-      gap: 8px;
+      gap: 10px;
     }
     .hero-quick button {
       background: rgba(255, 255, 255, .04);
@@ -240,7 +261,7 @@ export function renderMiniAppHtml(): string {
       padding: 10px 12px;
     }
     .hero-quick strong { display: block; margin-bottom: 2px; }
-    .hero-quick span { color: var(--muted); font-size: 12px; }
+    .hero-quick span { color: var(--muted); font-size: 13px; }
     .weekday-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -460,11 +481,10 @@ export function renderMiniAppHtml(): string {
       <div id="greetingBannerCard" class="card hidden">
         <div id="greetingBanner" class="greeting-banner"></div>
       </div>
-      <div class="tabs card">
-        <button data-tab="home" class="active">Главная</button>
-        <button data-tab="new">Новая заявка</button>
-        <button data-tab="my">Мои заявки</button>
-        <button id="tabAdmin" data-tab="admin" class="hidden">Админ</button>
+      <div id="compactNav" class="card compact-nav hidden">
+        <button id="compactGoHome" type="button">Главная</button>
+        <button id="compactGoMy" type="button">Мои заявки</button>
+        <div id="compactCurrent" class="current">Новая заявка</div>
       </div>
 
       <section id="tab-home" class="card">
@@ -538,6 +558,8 @@ export function renderMiniAppHtml(): string {
 
       <section id="tab-my" class="card hidden">
         <h2>Мои заявки</h2>
+        <button id="btnOpenNewFromMy">Новая заявка</button>
+        <button id="btnOpenAdminFromMy" class="hidden">Админ-панель</button>
         <button id="btnReloadMy">Обновить</button>
         <div class="chip-row" id="myStatusFilters">
           <button type="button" class="chip active" data-my-filter="ALL">Все</button>
@@ -684,8 +706,10 @@ export function renderMiniAppHtml(): string {
         appRoot: document.getElementById('appRoot'),
         greetingBannerCard: document.getElementById('greetingBannerCard'),
         greetingBanner: document.getElementById('greetingBanner'),
-        tabAdmin: document.getElementById('tabAdmin'),
-        tabHomeBtn: document.querySelector('.tabs button[data-tab="home"]'),
+        compactNav: document.getElementById('compactNav'),
+        compactGoHome: document.getElementById('compactGoHome'),
+        compactGoMy: document.getElementById('compactGoMy'),
+        compactCurrent: document.getElementById('compactCurrent'),
         profileBlock: document.getElementById('profileBlock'),
         newWizardHead: document.getElementById('newWizardHead'),
         newStep1: document.getElementById('newStep1'),
@@ -700,6 +724,8 @@ export function renderMiniAppHtml(): string {
         btnWizardNext: document.getElementById('btnWizardNext'),
         btnWizardExit: document.getElementById('btnWizardExit'),
         btnEditBeforeSubmit: document.getElementById('btnEditBeforeSubmit'),
+        btnOpenNewFromMy: document.getElementById('btnOpenNewFromMy'),
+        btnOpenAdminFromMy: document.getElementById('btnOpenAdminFromMy'),
         newSummary: document.getElementById('newSummary'),
         newSummaryFinal: document.getElementById('newSummaryFinal'),
         myRequests: document.getElementById('myRequests'),
@@ -1033,14 +1059,22 @@ export function renderMiniAppHtml(): string {
       }
 
       function switchTab(tab) {
-        document.querySelectorAll('.tabs button[data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
         ['home','new','my','admin'].forEach((t) => {
           const el = document.getElementById('tab-' + t);
           if (!el) return;
           el.classList.toggle('hidden', t !== tab);
         });
-        if (els.tabHomeBtn) {
-          els.tabHomeBtn.classList.toggle('hidden', tab === 'home');
+        if (els.compactNav) {
+          els.compactNav.classList.toggle('hidden', tab === 'home');
+        }
+        if (els.compactCurrent) {
+          const labels = {
+            home: 'Главная',
+            new: 'Новая заявка',
+            my: 'Мои заявки',
+            admin: 'Админ'
+          };
+          els.compactCurrent.textContent = labels[tab] || '';
         }
         localStorage.setItem('miniapp_last_tab', tab);
       }
@@ -1549,8 +1583,19 @@ export function renderMiniAppHtml(): string {
               '<li>Отслеживайте статус заявки в одном месте.</li>' +
               '<li>Консультации: AI-вайбкодинг и финансовое планирование с ИИ.</li>' +
             '</ul>' +
+            '<div class="hero-quick">' +
+              '<button id="homeGoNew" type="button"><strong>Новая заявка</strong><span>Записаться на консультацию</span></button>' +
+              '<button id="homeGoMy" type="button"><strong>Мои заявки</strong><span>Посмотреть статусы заявок</span></button>' +
+            '</div>' +
           '</div>'
         ].join('');
+        const homeGoNew = document.getElementById('homeGoNew');
+        if (homeGoNew) homeGoNew.addEventListener('click', () => switchTab('new'));
+        const homeGoMy = document.getElementById('homeGoMy');
+        if (homeGoMy) homeGoMy.addEventListener('click', async () => {
+          switchTab('my');
+          await loadMyRequests();
+        });
         const heroPhoto = document.getElementById('heroPhoto');
         if (heroPhoto) {
           heroPhoto.addEventListener('error', () => {
@@ -1566,7 +1611,9 @@ export function renderMiniAppHtml(): string {
         }
 
         if (role === 'admin') {
-          els.tabAdmin.classList.remove('hidden');
+          if (els.btnOpenAdminFromMy) {
+            els.btnOpenAdminFromMy.classList.remove('hidden');
+          }
           renderAdminTemplatePreview();
         }
 
@@ -1608,20 +1655,30 @@ export function renderMiniAppHtml(): string {
         setStatus(browserDevMode ? 'Подключено (локальный режим)' : 'Подключено', 'ok');
       }
 
-      document.querySelectorAll('.tabs button[data-tab]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          if (btn.dataset.tab === 'admin') {
-            const unlocked = await ensureAdminUnlocked();
-            if (!unlocked) return;
-            await runAutoCleanupIfEnabled();
-            await loadAdminRequests();
-            await loadAdminSettings();
-            await loadGoogleOAuthStatus();
-            switchAdminPanel('requests');
-          }
-          switchTab(btn.dataset.tab);
+      if (els.compactGoHome) {
+        els.compactGoHome.addEventListener('click', () => switchTab('home'));
+      }
+      if (els.compactGoMy) {
+        els.compactGoMy.addEventListener('click', async () => {
+          switchTab('my');
+          await loadMyRequests();
         });
-      });
+      }
+      if (els.btnOpenNewFromMy) {
+        els.btnOpenNewFromMy.addEventListener('click', () => switchTab('new'));
+      }
+      if (els.btnOpenAdminFromMy) {
+        els.btnOpenAdminFromMy.addEventListener('click', async () => {
+          const unlocked = await ensureAdminUnlocked();
+          if (!unlocked) return;
+          await runAutoCleanupIfEnabled();
+          await loadAdminRequests();
+          await loadAdminSettings();
+          await loadGoogleOAuthStatus();
+          switchAdminPanel('requests');
+          switchTab('admin');
+        });
+      }
       els.adminMenuRequests.addEventListener('click', () => switchAdminPanel('requests'));
       els.adminMenuSchedule.addEventListener('click', () => switchAdminPanel('schedule'));
       els.adminMenuOAuth.addEventListener('click', () => switchAdminPanel('oauth'));
