@@ -749,6 +749,7 @@ export function renderMiniAppHtml(): string {
           if (!el) return;
           el.classList.toggle('hidden', t !== tab);
         });
+        localStorage.setItem('miniapp_last_tab', tab);
       }
 
       function updateNewRequestProgress() {
@@ -1227,6 +1228,21 @@ export function renderMiniAppHtml(): string {
         els.aStatus.value = adminStatusFilter;
 
         await loadMyRequests();
+
+        const preferredTab = localStorage.getItem('miniapp_last_tab') || 'home';
+        if (preferredTab === 'my') {
+          switchTab('my');
+        } else if (preferredTab === 'new') {
+          switchTab('new');
+        } else if (preferredTab === 'admin' && role === 'admin') {
+          await runAutoCleanupIfEnabled();
+          await loadAdminRequests();
+          await loadAdminSettings();
+          await loadGoogleOAuthStatus();
+          switchTab('admin');
+        } else {
+          switchTab('home');
+        }
 
         els.appRoot.classList.remove('hidden');
         setStatus(browserDevMode ? 'Подключено (локальный режим)' : 'Подключено', 'ok');
