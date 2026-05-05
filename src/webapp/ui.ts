@@ -175,6 +175,16 @@ export function renderMiniAppHtml(): string {
       background: linear-gradient(135deg, rgba(0,229,255,.10), rgba(163,255,18,.08));
       margin-top: 10px;
     }
+    .hero-photo {
+      width: 88px;
+      height: 88px;
+      border-radius: 12px;
+      object-fit: cover;
+      border: 1px solid #1f4f6f;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, .35);
+      float: right;
+      margin: 0 0 8px 10px;
+    }
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -874,7 +884,7 @@ export function renderMiniAppHtml(): string {
         els.profileBlock.innerHTML = [
           '<div><strong>' + (user.first_name || '-') + ' ' + (user.last_name || '') + '</strong></div>',
           '<div class="muted">@' + (user.username || '-') + ' / роль: ' + (role === 'admin' ? 'админ' : 'пользователь') + '</div>',
-          '<div class="hero"><strong>Запись на консультацию к Екатерине</strong><div class="small muted">Здесь можно быстро выбрать удобное время и записаться на консультацию по AI-вайбкодингу и финансовому планированию с ИИ. Создайте заявку, выберите слот и отслеживайте статус в одном месте.</div></div>'
+          '<div class="hero"><img class="hero-photo" src="/miniapp/assets/home-photo.jpeg" alt="Фото консультанта" /><strong>Запись на консультацию к Екатерине</strong><div class="small muted">Здесь можно быстро выбрать удобное время и записаться на консультацию по AI-вайбкодингу и финансовому планированию с ИИ. Создайте заявку, выберите слот и отслеживайте статус в одном месте.</div><div style="clear:both"></div></div>'
         ].join('');
 
         if (role === 'admin') {

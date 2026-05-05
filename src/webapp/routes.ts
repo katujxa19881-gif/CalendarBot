@@ -1,4 +1,6 @@
 import { JournalActorRole, MeetingRequestStatus, User } from "@prisma/client";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { prisma } from "../db";
@@ -275,6 +277,20 @@ function isLocalBrowserHost(host: string | undefined): boolean {
 }
 
 export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void> {
+  app.get("/miniapp/assets/home-photo.jpeg", async (_request: FastifyRequest, reply: FastifyReply) => {
+    const miniAppConfig = getMiniAppConfig();
+    if (!miniAppConfig.enabled) {
+      reply.code(404).send("Mini app is disabled");
+      return;
+    }
+
+    const imagePath = join(process.cwd(), "src", "webapp", "assets", "home-photo.jpeg");
+    const image = await readFile(imagePath);
+    reply.header("content-type", "image/jpeg");
+    reply.header("cache-control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    reply.code(200).send(image);
+  });
+
   app.get("/miniapp", async (_request: FastifyRequest, reply: FastifyReply) => {
     const miniAppConfig = getMiniAppConfig();
     if (!miniAppConfig.enabled) {

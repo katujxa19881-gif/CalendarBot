@@ -100,7 +100,7 @@ function formatRequestCode(createdAt: Date): string {
   return `#${hh}${mm}`;
 }
 
-async function sendTelegramMessage(input: { chatId: string; text: string }): Promise<void> {
+async function sendTelegramMessage(input: { chatId: string; text: string; meetLink?: string | null }): Promise<void> {
   const { botToken } = getTelegramConfig();
   if (!botToken) {
     return;
@@ -114,7 +114,14 @@ async function sendTelegramMessage(input: { chatId: string; text: string }): Pro
       },
       body: JSON.stringify({
         chat_id: input.chatId,
-        text: input.text
+        text: input.text,
+        ...(input.meetLink
+          ? {
+              reply_markup: {
+                inline_keyboard: [[{ text: "Открыть встречу", url: input.meetLink }]]
+              }
+            }
+          : {})
       })
     });
     if (!response.ok) {
@@ -306,7 +313,8 @@ export async function approveMeetingRequestByAdmin(input: {
       `Тема: ${request.topic}`,
       `Дата и время: ${formatDateRangeMoscow(request.startAt, request.endAt)}`,
       ...(input.comment ? [`Комментарий: ${input.comment}`] : [])
-    ].join("\n")
+    ].join("\n"),
+    meetLink: calendarEvent.googleMeetLink
   });
 
   return request;
@@ -613,7 +621,8 @@ export async function rescheduleMeetingRequest(input: {
       `Номер заявки: ${formatRequestCode(request.createdAt)}`,
       `Новое время: ${formatDateRangeMoscow(input.newStartAt, input.newEndAt)}`,
       ...(input.comment ? [`Комментарий: ${input.comment}`] : [])
-    ].join("\n")
+    ].join("\n"),
+    meetLink: updatedEvent.googleMeetLink
   });
 
   return request;
