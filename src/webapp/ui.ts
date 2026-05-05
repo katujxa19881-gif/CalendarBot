@@ -358,6 +358,12 @@ export function renderMiniAppHtml(): string {
 
       <section id="tab-new" class="card hidden">
         <h2>Новая заявка</h2>
+        <div class="chip-row" id="newRequestProgress">
+          <button type="button" class="chip active" data-new-step="1">1. Формат</button>
+          <button type="button" class="chip" data-new-step="2">2. Слот</button>
+          <button type="button" class="chip" data-new-step="3">3. Контакты</button>
+          <button type="button" class="chip" data-new-step="4">4. Отправка</button>
+        </div>
         <div class="grid2">
           <label>Длительность
             <select id="fDuration">
@@ -433,6 +439,15 @@ export function renderMiniAppHtml(): string {
         <button id="btnReloadOAuthStatus">Обновить статус</button>
         <hr style="border-color:#173049; opacity:.5; margin:12px 0" />
         <h2>Заявки</h2>
+        <div class="chip-row" id="adminStatusFilters">
+          <button type="button" class="chip active" data-admin-filter="">Все</button>
+          <button type="button" class="chip" data-admin-filter="PENDING_APPROVAL">На согласовании</button>
+          <button type="button" class="chip" data-admin-filter="APPROVED">Подтвержденные</button>
+          <button type="button" class="chip" data-admin-filter="RESCHEDULED">Перенесенные</button>
+          <button type="button" class="chip" data-admin-filter="REJECTED">Отклоненные</button>
+          <button type="button" class="chip" data-admin-filter="CANCELLED">Отмененные</button>
+          <button type="button" class="chip" data-admin-filter="EXPIRED">Истекшие</button>
+        </div>
         <div class="grid2">
           <label>Статус
             <select id="aStatus">
@@ -500,8 +515,10 @@ export function renderMiniAppHtml(): string {
         btnCloseOnboarding: document.getElementById('btnCloseOnboarding'),
         tabAdmin: document.getElementById('tabAdmin'),
         profileBlock: document.getElementById('profileBlock'),
+        newRequestProgress: document.getElementById('newRequestProgress'),
         myRequests: document.getElementById('myRequests'),
         myStatusFilters: document.getElementById('myStatusFilters'),
+        adminStatusFilters: document.getElementById('adminStatusFilters'),
         adminRequests: document.getElementById('adminRequests'),
         fDuration: document.getElementById('fDuration'),
         fFormat: document.getElementById('fFormat'),
@@ -544,6 +561,7 @@ export function renderMiniAppHtml(): string {
       let replyModalResolver = null;
       let adminSelectedRequestIds = new Set();
       let myStatusFilter = 'ALL';
+      let adminStatusFilter = '';
 
       const statusLabels = {
         NEW: 'Новая',
@@ -695,6 +713,27 @@ export function renderMiniAppHtml(): string {
           const el = document.getElementById('tab-' + t);
           if (!el) return;
           el.classList.toggle('hidden', t !== tab);
+        });
+      }
+
+      function updateNewRequestProgress() {
+        const hasFormat = Boolean((els.fDuration.value || '').trim() && (els.fFormat.value || '').trim());
+        const hasSlot = selectedSlotIndex !== null;
+        const hasContacts = Boolean(
+          (els.fFirstName.value || '').trim() &&
+          (els.fLastName.value || '').trim() &&
+          (els.fEmail.value || '').trim() &&
+          (els.fTopic.value || '').trim()
+        );
+
+        let step = 1;
+        if (hasFormat) step = 2;
+        if (hasFormat && hasSlot) step = 3;
+        if (hasFormat && hasSlot && hasContacts) step = 4;
+
+        els.newRequestProgress.querySelectorAll('button[data-new-step]').forEach((node) => {
+          const nodeStep = Number(node.getAttribute('data-new-step') || '1');
+          node.classList.toggle('active', nodeStep === step);
         });
       }
 
@@ -921,7 +960,7 @@ export function renderMiniAppHtml(): string {
       async function loadAdminRequests() {
         if (role !== 'admin') return;
         const params = new URLSearchParams();
-        const status = (els.aStatus.value || '').trim();
+        const status = (adminStatusFilter || els.aStatus.value || '').trim();
         const from = (els.aFrom.value || '').trim();
         const to = (els.aTo.value || '').trim();
         const limitRaw = Number(els.aLimit.value || 30);
@@ -1073,6 +1112,7 @@ export function renderMiniAppHtml(): string {
         els.fLastName.value = user.last_name || '';
         els.fEmail.value = '';
         els.fTopic.value = '';
+        updateNewRequestProgress();
 
         await loadMyRequests();
 
@@ -1096,6 +1136,12 @@ export function renderMiniAppHtml(): string {
 
       els.fFormat.addEventListener('change', () => {
         els.locationWrap.classList.toggle('hidden', els.fFormat.value !== 'OFFLINE');
+        updateNewRequestProgress();
+      });
+      els.fDuration.addEventListener('change', updateNewRequestProgress);
+      ['fFirstName', 'fLastName', 'fEmail', 'fTopic'].forEach((id) => {
+        const input = document.getElementById(id);
+        input.addEventListener('input', updateNewRequestProgress);
       });
 
       document.getElementById('btnLoadSlots').addEventListener('click', async () => {
@@ -1116,6 +1162,7 @@ export function renderMiniAppHtml(): string {
         const data = await api('/api/webapp/slots?duration=' + duration);
         slotsCache = data.slots || [];
         selectedSlotIndex = null;
+        updateNewRequestProgress();
         els.fSlot.innerHTML = '';
 
         if (!slotsCache.length) {
@@ -1147,6 +1194,7 @@ export function renderMiniAppHtml(): string {
               selectedSlotIndex = index;
               els.fSlot.querySelectorAll('.slot-item').forEach((n) => n.classList.remove('active'));
               btn.classList.add('active');
+              updateNewRequestProgress();
             };
             details.appendChild(btn);
           });
@@ -1189,6 +1237,24 @@ export function renderMiniAppHtml(): string {
           });
           await loadMyRequests();
         });
+      });
+      els.adminStatusFilters.querySelectorAll('button[data-admin-filter]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          adminStatusFilter = btn.getAttribute('data-admin-filter') || '';
+          els.aStatus.value = adminStatusFilter;
+          els.adminStatusFilters.querySelectorAll('button[data-admin-filter]').forEach((node) => {
+            node.classList.toggle('active', node === btn);
+          });
+          await loadAdminRequests();
+        });
+      });
+      els.aStatus.addEventListener('change', async () => {
+        adminStatusFilter = (els.aStatus.value || '').trim();
+        els.adminStatusFilters.querySelectorAll('button[data-admin-filter]').forEach((node) => {
+          const value = node.getAttribute('data-admin-filter') || '';
+          node.classList.toggle('active', value === adminStatusFilter);
+        });
+        await loadAdminRequests();
       });
       document.getElementById('btnReloadAdmin').addEventListener('click', () => loadAdminRequests());
       document.getElementById('btnSelectClosed').addEventListener('click', async () => {
