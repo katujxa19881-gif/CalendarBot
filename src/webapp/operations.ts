@@ -105,7 +105,7 @@ async function sendTelegramMessage(input: {
   text: string;
   meetLink?: string | null;
   replyMarkup?: {
-    inline_keyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>>;
+    inline_keyboard: Array<Array<{ text: string; callback_data?: string; url?: string; web_app?: { url: string } }>>;
   };
   withMiniAppButton?: boolean;
 }): Promise<void> {
@@ -116,14 +116,15 @@ async function sendTelegramMessage(input: {
 
   try {
     const miniAppUrl = getMiniAppConfig().webAppUrl?.trim();
-    const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
+    const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string; web_app?: { url: string } }>> =
+      [];
     if (input.replyMarkup?.inline_keyboard?.length) {
       inlineKeyboard.push(...input.replyMarkup.inline_keyboard);
     } else if (input.meetLink) {
       inlineKeyboard.push([{ text: "Открыть встречу", url: input.meetLink }]);
     }
     if (input.withMiniAppButton && miniAppUrl) {
-      inlineKeyboard.push([{ text: "Открыть NexaMeet", url: miniAppUrl }]);
+      inlineKeyboard.push([{ text: "Открыть NexaMeet", web_app: { url: miniAppUrl } }]);
     }
 
     const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
