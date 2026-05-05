@@ -52,6 +52,11 @@ export function renderMiniAppHtml(): string {
     .muted { color: var(--muted); font-size: 13px; }
     .row { display: grid; gap: 10px; margin: 10px 0; }
     .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .row > label,
+    .grid2 > label {
+      display: grid;
+      gap: 6px;
+    }
     input, select, textarea, button {
       width: 100%;
       border-radius: 12px;
@@ -344,11 +349,11 @@ export function renderMiniAppHtml(): string {
     .wizard-step { display: none; }
     .wizard-step.active { display: block; }
     .wizard-step.active.step-review { display: grid; gap: 10px; }
-    .wizard-nav { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .wizard-nav { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 14px; }
     .wizard-nav .primary { grid-column: span 3; }
     .wizard-head { font-weight: 700; color: #cfe8ff; margin-bottom: 8px; }
     .wizard-summary { display: grid; gap: 6px; border: 1px solid #214661; border-radius: 10px; padding: 10px; background: rgba(9,19,32,.5); }
-    .wizard-summary div { font-size: 13px; color: #c7ddf0; }
+    .wizard-summary div { font-size: 13px; color: #c7ddf0; line-height: 1.5; }
     .review-note {
       border: 1px solid #1f4f6f;
       border-radius: 12px;
@@ -438,9 +443,6 @@ export function renderMiniAppHtml(): string {
 <body>
   <!-- miniapp-build: modal-v2 -->
   <div class="wrap">
-    <div class="card">
-      <div id="status" class="muted">Подключение...</div>
-    </div>
     <div id="loadingPanel" class="card loading-panel">
       <div class="skeleton lg"></div>
       <div class="skeleton md"></div>
@@ -669,7 +671,6 @@ export function renderMiniAppHtml(): string {
       if (tg) { tg.ready(); tg.expand(); }
 
       const els = {
-        status: document.getElementById('status'),
         loadingPanel: document.getElementById('loadingPanel'),
         appRoot: document.getElementById('appRoot'),
         tabAdmin: document.getElementById('tabAdmin'),
@@ -848,8 +849,10 @@ export function renderMiniAppHtml(): string {
       }
 
       function setStatus(text, type = 'muted') {
-        els.status.className = type;
-        els.status.textContent = text;
+        const node = document.getElementById('status');
+        if (!node) return;
+        node.className = type;
+        node.textContent = text;
       }
 
       async function api(url, options = {}) {
@@ -1177,13 +1180,18 @@ export function renderMiniAppHtml(): string {
               cancelBtn.textContent = 'Отменить';
               cancelBtn.className = 'danger';
               cancelBtn.onclick = async () => {
+                if (cancelBtn.disabled) return;
+                cancelBtn.disabled = true;
                 try {
                   await api('/api/webapp/requests/' + r.id + '/cancel', { method: 'POST', body: '{}' });
                   clearRequestCaches();
+                  showToast('Заявка отменена', 'ok');
                   await loadMyRequests();
                 } catch (error) {
                   showActionError(error);
                   await loadMyRequests();
+                } finally {
+                  cancelBtn.disabled = false;
                 }
               };
               actions.appendChild(cancelBtn);
