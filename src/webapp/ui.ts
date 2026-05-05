@@ -344,6 +344,17 @@ export function renderMiniAppHtml(): string {
     }
     .slot-date { color: #cce8ff; }
     .slot-time { color: #7af4ff; font-weight: 700; }
+    .wizard-step { display: none; }
+    .wizard-step.active { display: block; }
+    .wizard-nav { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .wizard-nav .primary { grid-column: span 3; }
+    .wizard-head { font-weight: 700; color: #cfe8ff; margin-bottom: 8px; }
+    .wizard-summary { display: grid; gap: 6px; border: 1px solid #214661; border-radius: 10px; padding: 10px; background: rgba(9,19,32,.5); }
+    .wizard-summary div { font-size: 13px; color: #c7ddf0; }
+    .admin-menu { display: grid; gap: 8px; margin: 10px 0; }
+    .admin-menu button { text-align: left; }
+    .admin-panel { display: none; }
+    .admin-panel.active { display: block; }
   </style>
 </head>
 <body>
@@ -378,50 +389,60 @@ export function renderMiniAppHtml(): string {
 
       <section id="tab-new" class="card hidden">
         <h2>Новая заявка</h2>
-        <div class="chip-row" id="newRequestProgress">
-          <button type="button" class="chip active" data-new-step="1">1. Формат</button>
-          <button type="button" class="chip" data-new-step="2">2. Слот</button>
-          <button type="button" class="chip" data-new-step="3">3. Контакты</button>
-          <button type="button" class="chip" data-new-step="4">4. Отправка</button>
+        <div id="newWizardHead" class="wizard-head">Шаг 1 из 8 • Тема</div>
+
+        <div id="newStep1" class="wizard-step active row">
+          <label>Тема <input id="fTopic" placeholder="Например: Консультация по AI" /></label>
         </div>
-        <div id="newStep1" class="row">
-        <div class="grid2">
-          <label>Длительность
-            <select id="fDuration">
-              <option value="15">15 мин</option>
-              <option value="30" selected>30 мин</option>
-              <option value="45">45 мин</option>
-              <option value="60">60 мин</option>
-              <option value="90">90 мин</option>
-            </select>
-          </label>
-          <label>Формат
-            <select id="fFormat">
-              <option value="ONLINE">Онлайн</option>
-              <option value="OFFLINE">Оффлайн</option>
-            </select>
-          </label>
+        <div id="newStep2" class="wizard-step row">
+          <label>Комментарий <textarea id="fDescription" placeholder="Если нужно, добавьте детали"></textarea></label>
         </div>
-        </div>
-        <div id="newStep2" class="row">
-          <button id="btnLoadSlots">Показать доступные слоты</button>
-          <div id="fSlot" class="slot-list muted">Слоты пока не загружены.</div>
-        </div>
-        <div id="newStep3" class="row">
-        <div class="grid2">
-          <label>Имя <input id="fFirstName" /></label>
-          <label>Фамилия <input id="fLastName" /></label>
-        </div>
-        <div class="row">
-          <label>Email <input id="fEmail" type="email" /></label>
-          <label>Тема <input id="fTopic" /></label>
-          <label>Описание <textarea id="fDescription"></textarea></label>
+        <div id="newStep3" class="wizard-step row">
+          <div class="grid2">
+            <label>Длительность
+              <select id="fDuration">
+                <option value="15">15 мин</option>
+                <option value="30" selected>30 мин</option>
+                <option value="45">45 мин</option>
+                <option value="60">60 мин</option>
+                <option value="90">90 мин</option>
+              </select>
+            </label>
+            <label>Формат
+              <select id="fFormat">
+                <option value="ONLINE">Онлайн</option>
+                <option value="OFFLINE">Оффлайн</option>
+              </select>
+            </label>
+          </div>
           <label id="locationWrap" class="hidden">Место/адрес <input id="fLocation" /></label>
         </div>
+        <div id="newStep4" class="wizard-step row">
+          <button id="btnLoadSlots">Показать доступные недели</button>
+          <div id="fWeekList" class="slot-list muted">Сначала нажмите кнопку выше.</div>
         </div>
-        <div id="newStep4" class="row">
+        <div id="newStep5" class="wizard-step row">
+          <div id="fDayList" class="slot-list muted">Выберите неделю.</div>
+        </div>
+        <div id="newStep6" class="wizard-step row">
+          <div id="fTimeList" class="slot-list muted">Выберите день.</div>
+        </div>
+        <div id="newStep7" class="wizard-step row">
+          <div id="newSummary" class="wizard-summary"></div>
+          <div class="grid2">
+            <label>Имя <input id="fFirstName" /></label>
+            <label>Фамилия <input id="fLastName" /></label>
+          </div>
+          <label>Email <input id="fEmail" type="email" /></label>
+        </div>
+        <div id="newStep8" class="wizard-step row">
           <button id="btnSubmitRequest" class="primary">Отправить заявку</button>
-          <div id="newRequestHint" class="muted">Заполните шаги 1–4 для отправки заявки.</div>
+          <div id="newRequestHint" class="muted">Проверьте данные и отправьте заявку.</div>
+        </div>
+        <div class="wizard-nav">
+          <button id="btnWizardBack">Назад</button>
+          <button id="btnWizardExit">Выйти</button>
+          <button id="btnWizardNext" class="primary">Далее</button>
         </div>
       </section>
 
@@ -440,6 +461,15 @@ export function renderMiniAppHtml(): string {
 
       <section id="tab-admin" class="card hidden">
         <h2>Админ — настройки</h2>
+        <div class="admin-menu">
+          <button id="adminMenuRequests">Заявки на согласование</button>
+          <button id="adminMenuSchedule">Настройка расписания</button>
+          <button id="adminMenuOAuth">Google/OAuth (активно)</button>
+          <button id="adminMenuTemplates">Шаблоны сообщений</button>
+          <button id="adminMenuBlocks">Блокировка слотов</button>
+        </div>
+
+        <div id="adminPanelSchedule" class="admin-panel active">
         <div class="grid2">
           <label>Начало дня <input id="sStart" type="number" /></label>
           <label>Конец дня <input id="sEnd" type="number" /></label>
@@ -461,10 +491,15 @@ export function renderMiniAppHtml(): string {
         <div class="row">
           <button id="btnSaveSettings" class="lime">Сохранить настройки</button>
         </div>
+        </div>
+
+        <div id="adminPanelOAuth" class="admin-panel">
         <h2>Google / OAuth</h2>
         <div class="oauth-status" id="oauthStatusBox">Загрузка статуса...</div>
         <button id="btnReloadOAuthStatus">Обновить статус</button>
-        <hr style="border-color:#173049; opacity:.5; margin:12px 0" />
+        </div>
+
+        <div id="adminPanelRequests" class="admin-panel">
         <h2>Заявки</h2>
         <div class="chip-row" id="adminStatusFilters">
           <button type="button" class="chip active" data-admin-filter="">Все</button>
@@ -501,6 +536,30 @@ export function renderMiniAppHtml(): string {
         </div>
         <button id="btnReloadAdmin">Обновить</button>
         <div id="adminRequests" class="row"></div>
+        </div>
+
+        <div id="adminPanelTemplates" class="admin-panel">
+          <h2>Шаблоны сообщений</h2>
+          <div class="muted">Шаблоны используются в действиях Подтвердить/Отклонить/Отменить/Перенести и доступны при нажатии кнопок в заявке.</div>
+        </div>
+
+        <div id="adminPanelBlocks" class="admin-panel">
+          <h2>Блокировка слотов</h2>
+          <div class="grid2">
+            <label>Автоочистка, дней
+              <input id="aAutoDays" type="number" min="1" max="365" value="7" />
+            </label>
+          </div>
+          <div class="grid2">
+            <label><input id="aAutoEnabled" type="checkbox" checked /> Автоочистка закрытых при открытии админки</label>
+          </div>
+          <div class="grid2">
+            <button id="btnSelectClosed">Выбрать закрытые</button>
+            <button id="btnClearSelected" class="danger">Очистить выбранные</button>
+            <button id="btnClearClosed">Очистить закрытые по сроку</button>
+            <button id="btnClearAllClosed" class="danger">Очистить все закрытые</button>
+          </div>
+        </div>
       </section>
     </div>
   </div>
@@ -532,18 +591,28 @@ export function renderMiniAppHtml(): string {
         btnCloseOnboarding: document.getElementById('btnCloseOnboarding'),
         tabAdmin: document.getElementById('tabAdmin'),
         profileBlock: document.getElementById('profileBlock'),
-        newRequestProgress: document.getElementById('newRequestProgress'),
+        newWizardHead: document.getElementById('newWizardHead'),
         newStep1: document.getElementById('newStep1'),
         newStep2: document.getElementById('newStep2'),
         newStep3: document.getElementById('newStep3'),
         newStep4: document.getElementById('newStep4'),
+        newStep5: document.getElementById('newStep5'),
+        newStep6: document.getElementById('newStep6'),
+        newStep7: document.getElementById('newStep7'),
+        newStep8: document.getElementById('newStep8'),
+        btnWizardBack: document.getElementById('btnWizardBack'),
+        btnWizardNext: document.getElementById('btnWizardNext'),
+        btnWizardExit: document.getElementById('btnWizardExit'),
+        newSummary: document.getElementById('newSummary'),
         myRequests: document.getElementById('myRequests'),
         myStatusFilters: document.getElementById('myStatusFilters'),
         adminStatusFilters: document.getElementById('adminStatusFilters'),
         adminRequests: document.getElementById('adminRequests'),
         fDuration: document.getElementById('fDuration'),
         fFormat: document.getElementById('fFormat'),
-        fSlot: document.getElementById('fSlot'),
+        fWeekList: document.getElementById('fWeekList'),
+        fDayList: document.getElementById('fDayList'),
+        fTimeList: document.getElementById('fTimeList'),
         fFirstName: document.getElementById('fFirstName'),
         fLastName: document.getElementById('fLastName'),
         fEmail: document.getElementById('fEmail'),
@@ -566,7 +635,17 @@ export function renderMiniAppHtml(): string {
         aTo: document.getElementById('aTo'),
         aLimit: document.getElementById('aLimit'),
         aAutoDays: document.getElementById('aAutoDays'),
-        aAutoEnabled: document.getElementById('aAutoEnabled')
+        aAutoEnabled: document.getElementById('aAutoEnabled'),
+        adminPanelRequests: document.getElementById('adminPanelRequests'),
+        adminPanelSchedule: document.getElementById('adminPanelSchedule'),
+        adminPanelOAuth: document.getElementById('adminPanelOAuth'),
+        adminPanelTemplates: document.getElementById('adminPanelTemplates'),
+        adminPanelBlocks: document.getElementById('adminPanelBlocks'),
+        adminMenuRequests: document.getElementById('adminMenuRequests'),
+        adminMenuSchedule: document.getElementById('adminMenuSchedule'),
+        adminMenuOAuth: document.getElementById('adminMenuOAuth'),
+        adminMenuTemplates: document.getElementById('adminMenuTemplates'),
+        adminMenuBlocks: document.getElementById('adminMenuBlocks')
       };
       const modalEls = {
         backdrop: document.getElementById('replyModalBackdrop'),
@@ -581,6 +660,9 @@ export function renderMiniAppHtml(): string {
       let role = 'user';
       let slotsCache = [];
       let selectedSlotIndex = null;
+      let selectedWeekId = null;
+      let selectedDayKey = null;
+      let wizardStep = 1;
       let replyModalResolver = null;
       let adminSelectedRequestIds = new Set();
       let myStatusFilter = localStorage.getItem('miniapp_my_status_filter') || 'ALL';
@@ -742,38 +824,63 @@ export function renderMiniAppHtml(): string {
         localStorage.setItem('miniapp_last_tab', tab);
       }
 
-      function updateNewRequestProgress() {
-        const hasFormat = Boolean((els.fDuration.value || '').trim() && (els.fFormat.value || '').trim());
-        const hasSlot = selectedSlotIndex !== null;
-        const hasContacts = Boolean(
-          (els.fFirstName.value || '').trim() &&
-          (els.fLastName.value || '').trim() &&
-          (els.fEmail.value || '').trim() &&
-          (els.fTopic.value || '').trim()
-        );
+      function switchAdminPanel(panel) {
+        const panels = {
+          requests: els.adminPanelRequests,
+          schedule: els.adminPanelSchedule,
+          oauth: els.adminPanelOAuth,
+          templates: els.adminPanelTemplates,
+          blocks: els.adminPanelBlocks
+        };
+        Object.values(panels).forEach((node) => node && node.classList.remove('active'));
+        if (panels[panel]) panels[panel].classList.add('active');
+      }
 
-        let step = 1;
-        if (hasFormat) step = 2;
-        if (hasFormat && hasSlot) step = 3;
-        if (hasFormat && hasSlot && hasContacts) step = 4;
+      function getWizardStepMeta(step) {
+        return [
+          'Тема',
+          'Комментарий',
+          'Длительность',
+          'Неделя',
+          'День',
+          'Время',
+          'Подтверждение',
+          'Отправка'
+        ][step - 1] || 'Шаг';
+      }
 
-        els.newRequestProgress.querySelectorAll('button[data-new-step]').forEach((node) => {
-          const nodeStep = Number(node.getAttribute('data-new-step') || '1');
-          node.classList.toggle('active', nodeStep === step);
+      function renderWizardSummary() {
+        const slot = selectedSlotIndex === null ? null : slotsCache[selectedSlotIndex];
+        const when = slot ? formatDateRange(slot.start_at, slot.end_at) : 'не выбрано';
+        els.newSummary.innerHTML = [
+          '<div><strong>Тема:</strong> ' + escapeHtml(els.fTopic.value || '-') + '</div>',
+          '<div><strong>Комментарий:</strong> ' + escapeHtml(els.fDescription.value || '-') + '</div>',
+          '<div><strong>Длительность:</strong> ' + escapeHtml(els.fDuration.value || '-') + ' мин</div>',
+          '<div><strong>Формат:</strong> ' + (els.fFormat.value === 'OFFLINE' ? 'Оффлайн' : 'Онлайн') + '</div>',
+          '<div><strong>Когда:</strong> ' + escapeHtml(when) + '</div>',
+          '<div><strong>Email:</strong> ' + escapeHtml(els.fEmail.value || '-') + '</div>'
+        ].join('');
+      }
+
+      function updateWizardUi() {
+        [1,2,3,4,5,6,7,8].forEach((n) => {
+          const node = document.getElementById('newStep' + n);
+          if (node) node.classList.toggle('active', n === wizardStep);
         });
+        els.newWizardHead.textContent = 'Шаг ' + wizardStep + ' из 8 • ' + getWizardStepMeta(wizardStep);
+        els.btnWizardBack.disabled = wizardStep === 1;
+        els.btnWizardNext.classList.toggle('hidden', wizardStep === 8);
+        if (wizardStep === 7 || wizardStep === 8) renderWizardSummary();
+      }
 
-        const missing = [];
-        if (!hasFormat) missing.push('выберите формат и длительность');
-        if (!hasSlot) missing.push('выберите слот');
-        if (!hasContacts) missing.push('заполните имя, фамилию, email и тему');
-        if (els.fFormat.value === 'OFFLINE' && !(els.fLocation.value || '').trim()) {
-          missing.push('укажите место встречи');
-        }
-        const isReady = missing.length === 0;
-        els.btnSubmitRequest.disabled = !isReady;
-        els.newRequestHint.textContent = isReady
-          ? 'Готово к отправке.'
-          : 'До отправки: ' + missing[0] + '.';
+      function canGoNext(step) {
+        if (step === 1) return Boolean((els.fTopic.value || '').trim());
+        if (step === 3) return Boolean((els.fDuration.value || '').trim() && (els.fFormat.value || '').trim());
+        if (step === 4) return Boolean(selectedWeekId);
+        if (step === 5) return Boolean(selectedDayKey);
+        if (step === 6) return selectedSlotIndex !== null;
+        if (step === 7) return Boolean((els.fFirstName.value || '').trim() && (els.fLastName.value || '').trim() && (els.fEmail.value || '').trim());
+        return true;
       }
 
       async function ensureAdminUnlocked() {
@@ -1206,7 +1313,7 @@ export function renderMiniAppHtml(): string {
         els.fLastName.value = user.last_name || '';
         els.fEmail.value = '';
         els.fTopic.value = '';
-        updateNewRequestProgress();
+        updateWizardUi();
         els.myStatusFilters.querySelectorAll('button[data-my-filter]').forEach((node) => {
           const value = node.getAttribute('data-my-filter') || 'ALL';
           node.classList.toggle('active', value === myStatusFilter);
@@ -1229,6 +1336,7 @@ export function renderMiniAppHtml(): string {
           await loadAdminRequests();
           await loadAdminSettings();
           await loadGoogleOAuthStatus();
+          switchAdminPanel('requests');
           switchTab('admin');
         } else {
           switchTab('home');
@@ -1247,28 +1355,20 @@ export function renderMiniAppHtml(): string {
             await loadAdminRequests();
             await loadAdminSettings();
             await loadGoogleOAuthStatus();
+            switchAdminPanel('requests');
           }
           switchTab(btn.dataset.tab);
         });
       });
+      els.adminMenuRequests.addEventListener('click', () => switchAdminPanel('requests'));
+      els.adminMenuSchedule.addEventListener('click', () => switchAdminPanel('schedule'));
+      els.adminMenuOAuth.addEventListener('click', () => switchAdminPanel('oauth'));
+      els.adminMenuTemplates.addEventListener('click', () => switchAdminPanel('templates'));
+      els.adminMenuBlocks.addEventListener('click', () => switchAdminPanel('blocks'));
 
       els.fFormat.addEventListener('change', () => {
         els.locationWrap.classList.toggle('hidden', els.fFormat.value !== 'OFFLINE');
-        updateNewRequestProgress();
       });
-      els.newRequestProgress.querySelectorAll('button[data-new-step]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const step = btn.getAttribute('data-new-step') || '1';
-          const target = document.getElementById('newStep' + step);
-          if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-      });
-      els.fDuration.addEventListener('change', updateNewRequestProgress);
-      ['fFirstName', 'fLastName', 'fEmail', 'fTopic', 'fLocation'].forEach((id) => {
-        const input = document.getElementById(id);
-        input.addEventListener('input', updateNewRequestProgress);
-      });
-
       document.getElementById('btnLoadSlots').addEventListener('click', async () => {
         const toMoscowDate = (iso) => new Date(new Date(iso).getTime() + 3 * 60 * 60 * 1000);
         const fmtDay = (date) => new Intl.DateTimeFormat('ru-RU', { day: '2-digit', month: '2-digit' }).format(date);
@@ -1287,11 +1387,14 @@ export function renderMiniAppHtml(): string {
         const data = await api('/api/webapp/slots?duration=' + duration);
         slotsCache = data.slots || [];
         selectedSlotIndex = null;
-        updateNewRequestProgress();
-        els.fSlot.innerHTML = '';
+        selectedWeekId = null;
+        selectedDayKey = null;
+        els.fWeekList.innerHTML = '';
+        els.fDayList.innerHTML = '<div class="muted">Выберите неделю.</div>';
+        els.fTimeList.innerHTML = '<div class="muted">Выберите день.</div>';
 
         if (!slotsCache.length) {
-          els.fSlot.innerHTML = '<div class="muted">Свободных слотов нет.</div>';
+          els.fWeekList.innerHTML = '<div class="muted">Свободных слотов нет.</div>';
           return;
         }
 
@@ -1302,46 +1405,80 @@ export function renderMiniAppHtml(): string {
           grouped.get(wk.id).items.push({ slot, index });
         });
 
-        [...grouped.values()].forEach((week, weekIndex) => {
-          const details = document.createElement('details');
-          details.className = 'group';
-          if (weekIndex === 0) details.open = true;
-          details.innerHTML = '<summary>' + week.label + '<span class="group-count">(' + week.items.length + ')</span></summary>';
-          const days = new Map();
-          week.items.forEach((item) => {
-            const parts = formatDateParts(item.slot.start_at);
-            const key = parts.date;
-            if (!days.has(key)) days.set(key, []);
-            days.get(key).push(item);
-          });
+        [...grouped.entries()].forEach(([weekId, week], weekIndex) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'slot-item';
+          btn.innerHTML = '<div class="slot-date">' + week.label + '</div><div class="slot-time">Слотов: ' + week.items.length + '</div>';
+          btn.onclick = () => {
+            selectedWeekId = weekId;
+            selectedDayKey = null;
+            selectedSlotIndex = null;
+            els.fWeekList.querySelectorAll('.slot-item').forEach((n) => n.classList.remove('active'));
+            btn.classList.add('active');
 
-          [...days.entries()].forEach(([dayLabel, dayItems]) => {
-            const dayWrap = document.createElement('div');
-            dayWrap.className = 'slot-day-group';
-            dayWrap.innerHTML = '<div class="slot-day-title">' + dayLabel + '</div>';
-
-            const grid = document.createElement('div');
-            grid.className = 'slot-time-grid';
-            dayItems.forEach(({ slot, index }) => {
-              const btn = document.createElement('button');
-              btn.type = 'button';
-              btn.className = 'slot-item';
-              const start = formatDateParts(slot.start_at);
-              const end = formatDateParts(slot.end_at);
-              btn.innerHTML = '<div class="slot-time">' + start.time + '–' + end.time + '</div>';
-              btn.onclick = () => {
-                selectedSlotIndex = index;
-                els.fSlot.querySelectorAll('.slot-item').forEach((n) => n.classList.remove('active'));
-                btn.classList.add('active');
-                updateNewRequestProgress();
-              };
-              grid.appendChild(btn);
+            const days = new Map();
+            week.items.forEach((item) => {
+              const parts = formatDateParts(item.slot.start_at);
+              const key = parts.date;
+              if (!days.has(key)) days.set(key, []);
+              days.get(key).push(item);
             });
-            dayWrap.appendChild(grid);
-            details.appendChild(dayWrap);
-          });
-          els.fSlot.appendChild(details);
+            els.fDayList.innerHTML = '';
+            [...days.entries()].forEach(([dayLabel, dayItems]) => {
+              const dayBtn = document.createElement('button');
+              dayBtn.type = 'button';
+              dayBtn.className = 'slot-item';
+              dayBtn.innerHTML = '<div class="slot-date">' + dayLabel + '</div><div class="slot-time">Слотов: ' + dayItems.length + '</div>';
+              dayBtn.onclick = () => {
+                selectedDayKey = dayLabel;
+                selectedSlotIndex = null;
+                els.fDayList.querySelectorAll('.slot-item').forEach((n) => n.classList.remove('active'));
+                dayBtn.classList.add('active');
+                els.fTimeList.innerHTML = '';
+                dayItems.forEach(({ slot, index }) => {
+                  const timeBtn = document.createElement('button');
+                  timeBtn.type = 'button';
+                  timeBtn.className = 'slot-item';
+                  const start = formatDateParts(slot.start_at);
+                  const end = formatDateParts(slot.end_at);
+                  timeBtn.innerHTML = '<div class="slot-time">' + start.time + '–' + end.time + ' (МСК)</div>';
+                  timeBtn.onclick = () => {
+                    selectedSlotIndex = index;
+                    els.fTimeList.querySelectorAll('.slot-item').forEach((n) => n.classList.remove('active'));
+                    timeBtn.classList.add('active');
+                  };
+                  els.fTimeList.appendChild(timeBtn);
+                });
+              };
+              els.fDayList.appendChild(dayBtn);
+            });
+            els.fTimeList.innerHTML = '<div class="muted">Выберите день.</div>';
+          };
+          if (weekIndex === 0) btn.click();
+          els.fWeekList.appendChild(btn);
         });
+      });
+
+      els.btnWizardBack.addEventListener('click', () => {
+        wizardStep = Math.max(1, wizardStep - 1);
+        updateWizardUi();
+      });
+      els.btnWizardExit.addEventListener('click', () => {
+        wizardStep = 1;
+        switchTab('home');
+        updateWizardUi();
+      });
+      els.btnWizardNext.addEventListener('click', async () => {
+        if (!canGoNext(wizardStep)) {
+          alert('Заполните текущий шаг.');
+          return;
+        }
+        if (wizardStep === 3 && !slotsCache.length) {
+          await document.getElementById('btnLoadSlots').click();
+        }
+        wizardStep = Math.min(8, wizardStep + 1);
+        updateWizardUi();
       });
 
       document.getElementById('btnSubmitRequest').addEventListener('click', async () => {
@@ -1366,12 +1503,17 @@ export function renderMiniAppHtml(): string {
           })
         });
         selectedSlotIndex = null;
+        selectedWeekId = null;
+        selectedDayKey = null;
         slotsCache = [];
-        els.fSlot.innerHTML = '<div class="muted">Слоты пока не загружены.</div>';
+        els.fWeekList.innerHTML = '<div class="muted">Сначала нажмите кнопку выше.</div>';
+        els.fDayList.innerHTML = '<div class="muted">Выберите неделю.</div>';
+        els.fTimeList.innerHTML = '<div class="muted">Выберите день.</div>';
         els.fTopic.value = '';
         els.fDescription.value = '';
         els.fLocation.value = '';
-        updateNewRequestProgress();
+        wizardStep = 1;
+        updateWizardUi();
         alert('Заявка отправлена');
         switchTab('my');
         await loadMyRequests();
