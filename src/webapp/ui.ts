@@ -521,18 +521,6 @@ export function renderMiniAppHtml(): string {
           <label>Лимит
             <input id="aLimit" type="number" min="1" max="100" value="30" />
           </label>
-          <label>Автоочистка, дней
-            <input id="aAutoDays" type="number" min="1" max="365" value="7" />
-          </label>
-        </div>
-        <div class="grid2">
-          <label><input id="aAutoEnabled" type="checkbox" checked /> Автоочистка закрытых при открытии админки</label>
-        </div>
-        <div class="grid2">
-          <button id="btnSelectClosed">Выбрать закрытые</button>
-          <button id="btnClearSelected" class="danger">Очистить выбранные</button>
-          <button id="btnClearClosed">Очистить закрытые по сроку</button>
-          <button id="btnClearAllClosed" class="danger">Очистить все закрытые</button>
         </div>
         <button id="btnReloadAdmin">Обновить</button>
         <div id="adminRequests" class="row"></div>
@@ -541,6 +529,7 @@ export function renderMiniAppHtml(): string {
         <div id="adminPanelTemplates" class="admin-panel">
           <h2>Шаблоны сообщений</h2>
           <div class="muted">Шаблоны используются в действиях Подтвердить/Отклонить/Отменить/Перенести и доступны при нажатии кнопок в заявке.</div>
+          <div id="adminTemplatePreview" class="wizard-summary" style="margin-top:8px"></div>
         </div>
 
         <div id="adminPanelBlocks" class="admin-panel">
@@ -645,7 +634,8 @@ export function renderMiniAppHtml(): string {
         adminMenuSchedule: document.getElementById('adminMenuSchedule'),
         adminMenuOAuth: document.getElementById('adminMenuOAuth'),
         adminMenuTemplates: document.getElementById('adminMenuTemplates'),
-        adminMenuBlocks: document.getElementById('adminMenuBlocks')
+        adminMenuBlocks: document.getElementById('adminMenuBlocks'),
+        adminTemplatePreview: document.getElementById('adminTemplatePreview')
       };
       const modalEls = {
         backdrop: document.getElementById('replyModalBackdrop'),
@@ -705,6 +695,19 @@ export function renderMiniAppHtml(): string {
           'Обновила время встречи по заявке «{topic}». Актуальный слот: {date}.'
         ]
       };
+      function renderAdminTemplatePreview() {
+        if (!els.adminTemplatePreview) return;
+        const blocks = [
+          { title: 'Подтверждение', key: 'approve' },
+          { title: 'Отклонение', key: 'reject' },
+          { title: 'Отмена', key: 'cancel' },
+          { title: 'Перенос', key: 'reschedule' }
+        ];
+        els.adminTemplatePreview.innerHTML = blocks.map((b) => {
+          const first = (adminReplyTemplates[b.key] && adminReplyTemplates[b.key][0]) || '-';
+          return '<div><strong>' + b.title + ':</strong> ' + escapeHtml(first) + '</div>';
+        }).join('');
+      }
 
       function normalizeTopic(topic) {
         const t = (topic || '').trim();
@@ -824,6 +827,7 @@ export function renderMiniAppHtml(): string {
         localStorage.setItem('miniapp_last_tab', tab);
       }
 
+      let currentAdminPanel = 'requests';
       function switchAdminPanel(panel) {
         const panels = {
           requests: els.adminPanelRequests,
@@ -832,8 +836,16 @@ export function renderMiniAppHtml(): string {
           templates: els.adminPanelTemplates,
           blocks: els.adminPanelBlocks
         };
+        if (currentAdminPanel === panel) {
+          Object.values(panels).forEach((node) => node && node.classList.remove('active'));
+          currentAdminPanel = '';
+          return;
+        }
         Object.values(panels).forEach((node) => node && node.classList.remove('active'));
-        if (panels[panel]) panels[panel].classList.add('active');
+        if (panels[panel]) {
+          panels[panel].classList.add('active');
+          currentAdminPanel = panel;
+        }
       }
 
       function getWizardStepMeta(step) {
@@ -1303,6 +1315,7 @@ export function renderMiniAppHtml(): string {
 
         if (role === 'admin') {
           els.tabAdmin.classList.remove('hidden');
+          renderAdminTemplatePreview();
         }
 
         if (${onboardingEnabled} && localStorage.getItem('miniapp_onboarding_done') !== '1') {
@@ -1363,7 +1376,10 @@ export function renderMiniAppHtml(): string {
       els.adminMenuRequests.addEventListener('click', () => switchAdminPanel('requests'));
       els.adminMenuSchedule.addEventListener('click', () => switchAdminPanel('schedule'));
       els.adminMenuOAuth.addEventListener('click', () => switchAdminPanel('oauth'));
-      els.adminMenuTemplates.addEventListener('click', () => switchAdminPanel('templates'));
+      els.adminMenuTemplates.addEventListener('click', () => {
+        switchAdminPanel('templates');
+        renderAdminTemplatePreview();
+      });
       els.adminMenuBlocks.addEventListener('click', () => switchAdminPanel('blocks'));
 
       els.fFormat.addEventListener('change', () => {
@@ -1409,13 +1425,15 @@ export function renderMiniAppHtml(): string {
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = 'slot-item';
-          btn.innerHTML = '<div class="slot-date">' + week.label + '</div><div class="slot-time">Слотов: ' + week.items.length + '</div>';
+          btn.innerHTML = '<div class="slot-date">' + week.label + '</div>';
           btn.onclick = () => {
             selectedWeekId = weekId;
             selectedDayKey = null;
             selectedSlotIndex = null;
             els.fWeekList.querySelectorAll('.slot-item').forEach((n) => n.classList.remove('active'));
             btn.classList.add('active');
+            wizardStep = 5;
+            updateWizardUi();
 
             const days = new Map();
             week.items.forEach((item) => {
@@ -1429,12 +1447,14 @@ export function renderMiniAppHtml(): string {
               const dayBtn = document.createElement('button');
               dayBtn.type = 'button';
               dayBtn.className = 'slot-item';
-              dayBtn.innerHTML = '<div class="slot-date">' + dayLabel + '</div><div class="slot-time">Слотов: ' + dayItems.length + '</div>';
+              dayBtn.innerHTML = '<div class="slot-date">' + dayLabel + '</div>';
               dayBtn.onclick = () => {
                 selectedDayKey = dayLabel;
                 selectedSlotIndex = null;
                 els.fDayList.querySelectorAll('.slot-item').forEach((n) => n.classList.remove('active'));
                 dayBtn.classList.add('active');
+                wizardStep = 6;
+                updateWizardUi();
                 els.fTimeList.innerHTML = '';
                 dayItems.forEach(({ slot, index }) => {
                   const timeBtn = document.createElement('button');
@@ -1447,6 +1467,8 @@ export function renderMiniAppHtml(): string {
                     selectedSlotIndex = index;
                     els.fTimeList.querySelectorAll('.slot-item').forEach((n) => n.classList.remove('active'));
                     timeBtn.classList.add('active');
+                    wizardStep = 7;
+                    updateWizardUi();
                   };
                   els.fTimeList.appendChild(timeBtn);
                 });
