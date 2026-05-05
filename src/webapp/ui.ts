@@ -384,6 +384,7 @@ export function renderMiniAppHtml(): string {
           <button type="button" class="chip" data-new-step="3">3. Контакты</button>
           <button type="button" class="chip" data-new-step="4">4. Отправка</button>
         </div>
+        <div id="newStep1" class="row">
         <div class="grid2">
           <label>Длительность
             <select id="fDuration">
@@ -401,10 +402,12 @@ export function renderMiniAppHtml(): string {
             </select>
           </label>
         </div>
-        <div class="row">
+        </div>
+        <div id="newStep2" class="row">
           <button id="btnLoadSlots">Показать доступные слоты</button>
           <div id="fSlot" class="slot-list muted">Слоты пока не загружены.</div>
         </div>
+        <div id="newStep3" class="row">
         <div class="grid2">
           <label>Имя <input id="fFirstName" /></label>
           <label>Фамилия <input id="fLastName" /></label>
@@ -414,6 +417,9 @@ export function renderMiniAppHtml(): string {
           <label>Тема <input id="fTopic" /></label>
           <label>Описание <textarea id="fDescription"></textarea></label>
           <label id="locationWrap" class="hidden">Место/адрес <input id="fLocation" /></label>
+        </div>
+        </div>
+        <div id="newStep4" class="row">
           <button id="btnSubmitRequest" class="primary">Отправить заявку</button>
           <div id="newRequestHint" class="muted">Заполните шаги 1–4 для отправки заявки.</div>
         </div>
@@ -537,6 +543,10 @@ export function renderMiniAppHtml(): string {
         tabAdmin: document.getElementById('tabAdmin'),
         profileBlock: document.getElementById('profileBlock'),
         newRequestProgress: document.getElementById('newRequestProgress'),
+        newStep1: document.getElementById('newStep1'),
+        newStep2: document.getElementById('newStep2'),
+        newStep3: document.getElementById('newStep3'),
+        newStep4: document.getElementById('newStep4'),
         myRequests: document.getElementById('myRequests'),
         myStatusFilters: document.getElementById('myStatusFilters'),
         adminStatusFilters: document.getElementById('adminStatusFilters'),
@@ -1173,6 +1183,13 @@ export function renderMiniAppHtml(): string {
       els.fFormat.addEventListener('change', () => {
         els.locationWrap.classList.toggle('hidden', els.fFormat.value !== 'OFFLINE');
         updateNewRequestProgress();
+      });
+      els.newRequestProgress.querySelectorAll('button[data-new-step]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const step = btn.getAttribute('data-new-step') || '1';
+          const target = document.getElementById('newStep' + step);
+          if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
       });
       els.fDuration.addEventListener('change', updateNewRequestProgress);
       ['fFirstName', 'fLastName', 'fEmail', 'fTopic', 'fLocation'].forEach((id) => {
