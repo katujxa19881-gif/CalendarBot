@@ -1006,6 +1006,26 @@ export function renderMiniAppHtml(): string {
       async function loadMyRequests() {
         const data = await api('/api/webapp/requests/my');
         const all = data.requests || [];
+        const closedCount = all.filter((r) => ['REJECTED', 'CANCELLED', 'EXPIRED'].includes(String(r.status || ''))).length;
+        const myCounts = {
+          ALL: all.length,
+          PENDING_APPROVAL: all.filter((r) => r.status === 'PENDING_APPROVAL').length,
+          APPROVED: all.filter((r) => r.status === 'APPROVED').length,
+          RESCHEDULED: all.filter((r) => r.status === 'RESCHEDULED').length,
+          CLOSED: closedCount
+        };
+        els.myStatusFilters.querySelectorAll('button[data-my-filter]').forEach((btn) => {
+          const key = btn.getAttribute('data-my-filter') || 'ALL';
+          const count = myCounts[key] || 0;
+          const labelMap = {
+            ALL: 'Все',
+            PENDING_APPROVAL: 'На согласовании',
+            APPROVED: 'Подтвержденные',
+            RESCHEDULED: 'Перенесенные',
+            CLOSED: 'Закрытые'
+          };
+          btn.textContent = labelMap[key] + ' (' + count + ')';
+        });
         const filtered = all.filter((r) => {
           if (myStatusFilter === 'ALL') return true;
           if (myStatusFilter === 'CLOSED') {
@@ -1031,6 +1051,30 @@ export function renderMiniAppHtml(): string {
         if (to) params.set('to', new Date(to + 'T23:59:59.999Z').toISOString());
 
         const data = await api('/api/webapp/admin/requests?' + params.toString());
+        const all = data.requests || [];
+        const adminCounts = {
+          '': all.length,
+          PENDING_APPROVAL: all.filter((r) => r.status === 'PENDING_APPROVAL').length,
+          APPROVED: all.filter((r) => r.status === 'APPROVED').length,
+          RESCHEDULED: all.filter((r) => r.status === 'RESCHEDULED').length,
+          REJECTED: all.filter((r) => r.status === 'REJECTED').length,
+          CANCELLED: all.filter((r) => r.status === 'CANCELLED').length,
+          EXPIRED: all.filter((r) => r.status === 'EXPIRED').length
+        };
+        els.adminStatusFilters.querySelectorAll('button[data-admin-filter]').forEach((btn) => {
+          const key = btn.getAttribute('data-admin-filter') || '';
+          const count = adminCounts[key] || 0;
+          const labelMap = {
+            '': 'Все',
+            PENDING_APPROVAL: 'На согласовании',
+            APPROVED: 'Подтвержденные',
+            RESCHEDULED: 'Перенесенные',
+            REJECTED: 'Отклоненные',
+            CANCELLED: 'Отмененные',
+            EXPIRED: 'Истекшие'
+          };
+          btn.textContent = labelMap[key] + ' (' + count + ')';
+        });
         renderRequests(els.adminRequests, data.requests || [], 'admin');
       }
 
