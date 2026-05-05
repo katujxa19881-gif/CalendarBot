@@ -928,7 +928,9 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
         user: {
           telegram_id: item.user.telegramId,
           username: item.user.username
-        }
+        },
+        can_cancel: isCancelAllowed(item.status),
+        can_reschedule: isRescheduleAllowed(item.status)
       }))
     });
   });

@@ -1371,7 +1371,10 @@ export function renderMiniAppHtml(): string {
       }
 
       async function bootstrap() {
-        const initData = tg && tg.initData ? tg.initData : '';
+        const hashParams = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+        const queryParams = new URLSearchParams(window.location.search || '');
+        const initDataFromUrl = hashParams.get('tgWebAppData') || queryParams.get('tgWebAppData') || '';
+        const initData = (tg && tg.initData ? tg.initData : '') || initDataFromUrl;
         let auth = null;
         let browserDevMode = false;
 
