@@ -248,6 +248,26 @@ export function renderMiniAppHtml(): string {
     }
     .oauth-badge.ok { color: #7effbc; border-color: #2f8d61; }
     .oauth-badge.err { color: #ffacb3; border-color: #8a4651; }
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .chip {
+      width: auto;
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid #255173;
+      background: rgba(12, 25, 39, .7);
+      color: #b8d6eb;
+    }
+    .chip.active {
+      border-color: var(--cyan);
+      color: #dfffff;
+      box-shadow: 0 0 0 1px rgba(0,229,255,.25) inset;
+    }
     @media (max-width: 540px) {
       .hero-intro { grid-template-columns: 84px 1fr; }
       .hero-photo { width: 84px; height: 84px; }
@@ -375,6 +395,13 @@ export function renderMiniAppHtml(): string {
       <section id="tab-my" class="card hidden">
         <h2>Мои заявки</h2>
         <button id="btnReloadMy">Обновить</button>
+        <div class="chip-row" id="myStatusFilters">
+          <button type="button" class="chip active" data-my-filter="ALL">Все</button>
+          <button type="button" class="chip" data-my-filter="PENDING_APPROVAL">На согласовании</button>
+          <button type="button" class="chip" data-my-filter="APPROVED">Подтвержденные</button>
+          <button type="button" class="chip" data-my-filter="RESCHEDULED">Перенесенные</button>
+          <button type="button" class="chip" data-my-filter="CLOSED">Закрытые</button>
+        </div>
         <div id="myRequests" class="row"></div>
       </section>
 
@@ -474,6 +501,7 @@ export function renderMiniAppHtml(): string {
         tabAdmin: document.getElementById('tabAdmin'),
         profileBlock: document.getElementById('profileBlock'),
         myRequests: document.getElementById('myRequests'),
+        myStatusFilters: document.getElementById('myStatusFilters'),
         adminRequests: document.getElementById('adminRequests'),
         fDuration: document.getElementById('fDuration'),
         fFormat: document.getElementById('fFormat'),
@@ -515,6 +543,7 @@ export function renderMiniAppHtml(): string {
       let selectedSlotIndex = null;
       let replyModalResolver = null;
       let adminSelectedRequestIds = new Set();
+      let myStatusFilter = 'ALL';
 
       const statusLabels = {
         NEW: 'Новая',
@@ -878,7 +907,15 @@ export function renderMiniAppHtml(): string {
 
       async function loadMyRequests() {
         const data = await api('/api/webapp/requests/my');
-        renderRequests(els.myRequests, data.requests || [], 'my');
+        const all = data.requests || [];
+        const filtered = all.filter((r) => {
+          if (myStatusFilter === 'ALL') return true;
+          if (myStatusFilter === 'CLOSED') {
+            return ['REJECTED', 'CANCELLED', 'EXPIRED'].includes(String(r.status || ''));
+          }
+          return r.status === myStatusFilter;
+        });
+        renderRequests(els.myRequests, filtered, 'my');
       }
 
       async function loadAdminRequests() {
@@ -1144,6 +1181,15 @@ export function renderMiniAppHtml(): string {
       });
 
       document.getElementById('btnReloadMy').addEventListener('click', () => loadMyRequests());
+      els.myStatusFilters.querySelectorAll('button[data-my-filter]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          myStatusFilter = btn.getAttribute('data-my-filter') || 'ALL';
+          els.myStatusFilters.querySelectorAll('button[data-my-filter]').forEach((node) => {
+            node.classList.toggle('active', node === btn);
+          });
+          await loadMyRequests();
+        });
+      });
       document.getElementById('btnReloadAdmin').addEventListener('click', () => loadAdminRequests());
       document.getElementById('btnSelectClosed').addEventListener('click', async () => {
         const data = await api('/api/webapp/admin/requests?limit=100');
