@@ -23,7 +23,7 @@ import {
 } from "../integrations/google-calendar";
 import { logEvent } from "../logger";
 import { ensureSlotStillAvailable } from "../application/slots";
-import { getApprovalConfig, getTelegramConfig } from "../env";
+import { getApprovalConfig, getMiniAppConfig, getTelegramConfig } from "../env";
 
 export class WebAppOperationError extends Error {
   public readonly code:
@@ -107,6 +107,7 @@ async function sendTelegramMessage(input: {
   replyMarkup?: {
     inline_keyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>>;
   };
+  withMiniAppButton?: boolean;
 }): Promise<void> {
   const { botToken } = getTelegramConfig();
   if (!botToken) {
@@ -114,6 +115,17 @@ async function sendTelegramMessage(input: {
   }
 
   try {
+    const miniAppUrl = getMiniAppConfig().webAppUrl?.trim();
+    const inlineKeyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [];
+    if (input.replyMarkup?.inline_keyboard?.length) {
+      inlineKeyboard.push(...input.replyMarkup.inline_keyboard);
+    } else if (input.meetLink) {
+      inlineKeyboard.push([{ text: "Открыть встречу", url: input.meetLink }]);
+    }
+    if (input.withMiniAppButton && miniAppUrl) {
+      inlineKeyboard.push([{ text: "Открыть NexaMeet", url: miniAppUrl }]);
+    }
+
     const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
       method: "POST",
       headers: {
@@ -122,17 +134,7 @@ async function sendTelegramMessage(input: {
       body: JSON.stringify({
         chat_id: input.chatId,
         text: input.text,
-        ...(input.replyMarkup
-          ? {
-              reply_markup: input.replyMarkup
-            }
-          : input.meetLink
-          ? {
-              reply_markup: {
-                inline_keyboard: [[{ text: "Открыть встречу", url: input.meetLink }]]
-              }
-            }
-          : {})
+        ...(inlineKeyboard.length ? { reply_markup: { inline_keyboard: inlineKeyboard } } : {})
       })
     });
     if (!response.ok) {
@@ -325,7 +327,8 @@ export async function approveMeetingRequestByAdmin(input: {
       `Дата и время: ${formatDateRangeMoscow(request.startAt, request.endAt)}`,
       ...(input.comment ? [`Комментарий: ${input.comment}`] : [])
     ].join("\n"),
-    meetLink: calendarEvent.googleMeetLink
+    meetLink: calendarEvent.googleMeetLink,
+    withMiniAppButton: true
   });
 
   return request;
@@ -393,7 +396,8 @@ export async function rejectMeetingRequestByAdmin(input: {
 
   await sendTelegramMessage({
     chatId: request.user.telegramId,
-    text: lines.join("\n")
+    text: lines.join("\n"),
+    withMiniAppButton: true
   });
 
   return request;
@@ -488,7 +492,8 @@ export async function cancelMeetingRequest(input: {
 
   await sendTelegramMessage({
     chatId: request.user.telegramId,
-    text: cancelLines.join("\n")
+    text: cancelLines.join("\n"),
+    withMiniAppButton: true
   });
 
   return request;
@@ -633,7 +638,8 @@ export async function rescheduleMeetingRequest(input: {
       `Новое время: ${formatDateRangeMoscow(input.newStartAt, input.newEndAt)}`,
       ...(input.comment ? [`Комментарий: ${input.comment}`] : [])
     ].join("\n"),
-    meetLink: updatedEvent.googleMeetLink
+    meetLink: updatedEvent.googleMeetLink,
+    withMiniAppButton: true
   });
 
   return request;

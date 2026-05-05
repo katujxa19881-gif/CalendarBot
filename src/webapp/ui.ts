@@ -363,6 +363,24 @@ export function renderMiniAppHtml(): string {
     .admin-menu button { text-align: left; }
     .admin-panel { display: none; }
     .admin-panel.active { display: block; }
+    .loading-panel {
+      display: grid;
+      gap: 8px;
+    }
+    .skeleton {
+      height: 14px;
+      border-radius: 8px;
+      background: linear-gradient(90deg, rgba(26,48,68,.55), rgba(43,80,112,.9), rgba(26,48,68,.55));
+      background-size: 220% 100%;
+      animation: sk 1.2s linear infinite;
+    }
+    .skeleton.lg { height: 20px; width: 70%; }
+    .skeleton.md { width: 92%; }
+    .skeleton.sm { width: 58%; }
+    @keyframes sk {
+      0% { background-position: 200% 0; }
+      100% { background-position: -20% 0; }
+    }
     .subpanel {
       border: 1px solid #1b344a;
       border-radius: 12px;
@@ -412,6 +430,12 @@ export function renderMiniAppHtml(): string {
     <div class="card">
       <h1>${escapeHtml(appTitle)}</h1>
       <div id="status" class="muted">Подключение...</div>
+    </div>
+    <div id="loadingPanel" class="card loading-panel">
+      <div class="skeleton lg"></div>
+      <div class="skeleton md"></div>
+      <div class="skeleton md"></div>
+      <div class="skeleton sm"></div>
     </div>
 
     <div id="onboarding" class="card hidden">
@@ -625,6 +649,16 @@ export function renderMiniAppHtml(): string {
     </div>
   </div>
 
+  <div id="rescheduleModalBackdrop" class="modal-backdrop hidden">
+    <div class="modal">
+      <h3 id="rescheduleModalTitle">Выбор нового слота</h3>
+      <div id="rescheduleSlotList" class="template-grid"></div>
+      <div class="modal-actions">
+        <button id="rescheduleModalCancel">Отмена</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     (() => {
       const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
@@ -632,6 +666,7 @@ export function renderMiniAppHtml(): string {
 
       const els = {
         status: document.getElementById('status'),
+        loadingPanel: document.getElementById('loadingPanel'),
         appRoot: document.getElementById('appRoot'),
         onboarding: document.getElementById('onboarding'),
         btnAddHome: document.getElementById('btnAddHome'),
@@ -705,6 +740,12 @@ export function renderMiniAppHtml(): string {
         cancel: document.getElementById('replyModalCancel'),
         submit: document.getElementById('replyModalSubmit')
       };
+      const rescheduleModalEls = {
+        backdrop: document.getElementById('rescheduleModalBackdrop'),
+        title: document.getElementById('rescheduleModalTitle'),
+        slotList: document.getElementById('rescheduleSlotList'),
+        cancel: document.getElementById('rescheduleModalCancel')
+      };
 
       let token = null;
       let role = 'user';
@@ -714,12 +755,14 @@ export function renderMiniAppHtml(): string {
       let selectedDayKey = null;
       let wizardStep = 1;
       let replyModalResolver = null;
+      let rescheduleModalResolver = null;
       let toastTimer = null;
       let adminSelectedRequestIds = new Set();
       let myStatusFilter = localStorage.getItem('miniapp_my_status_filter') || 'ALL';
       let adminStatusFilter = localStorage.getItem('miniapp_admin_status_filter') || '';
       let openMyGroups = new Set(JSON.parse(localStorage.getItem('miniapp_open_groups_my') || '[]'));
       let openAdminGroups = new Set(JSON.parse(localStorage.getItem('miniapp_open_groups_admin') || '[]'));
+      const CACHE_TTL_MS = 15000;
 
       const statusLabels = {
         NEW: 'Новая',
@@ -837,6 +880,40 @@ export function renderMiniAppHtml(): string {
         }, 1800);
       }
 
+      function setLoading(isLoading) {
+        if (!els.loadingPanel) return;
+        els.loadingPanel.classList.toggle('hidden', !isLoading);
+      }
+
+      function loadCachedJson(key, ttlMs = CACHE_TTL_MS) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (!raw) return null;
+          const parsed = JSON.parse(raw);
+          if (!parsed || typeof parsed.ts !== 'number') return null;
+          if (Date.now() - parsed.ts > ttlMs) return null;
+          return parsed.value ?? null;
+        } catch {
+          return null;
+        }
+      }
+
+      function saveCachedJson(key, value) {
+        try {
+          localStorage.setItem(key, JSON.stringify({ ts: Date.now(), value }));
+        } catch {}
+      }
+
+      function clearRequestCaches() {
+        try {
+          Object.keys(localStorage).forEach((key) => {
+            if (key.startsWith('miniapp_cache_my_requests') || key.startsWith('miniapp_cache_admin_requests_')) {
+              localStorage.removeItem(key);
+            }
+          });
+        } catch {}
+      }
+
       function applyTemplateVars(template, request) {
         return template
           .replaceAll('{topic}', normalizeTopic(request.topic))
@@ -899,30 +976,43 @@ export function renderMiniAppHtml(): string {
 
       async function chooseRescheduleSlot(requestItem) {
         const duration = Number(requestItem.duration_minutes || 30);
-        const data = await api(
-          '/api/webapp/slots?duration=' + duration + '&exclude_request_id=' + encodeURIComponent(requestItem.id)
-        );
+        const cacheKey = 'miniapp_slots_reschedule_' + duration + '_' + requestItem.id;
+        const cached = loadCachedJson(cacheKey, 12000);
+        const data =
+          cached ||
+          (await api('/api/webapp/slots?duration=' + duration + '&exclude_request_id=' + encodeURIComponent(requestItem.id)));
+        if (!cached) saveCachedJson(cacheKey, data);
         const slots = Array.isArray(data.slots) ? data.slots : [];
         if (!slots.length) {
           showToast('Нет доступных слотов для переноса', 'err');
           return null;
         }
 
-        const options = slots.slice(0, 15).map((slot, idx) => {
-          return (idx + 1) + '. ' + formatDateRange(slot.start_at, slot.end_at);
-        });
-
-        const input = prompt(
-          'Выберите номер нового слота (1-' + options.length + '):\\n\\n' + options.join('\\n'),
-          '1'
-        );
-        if (input === null) return null;
-        const selected = Number(input.trim());
-        if (!Number.isFinite(selected) || selected < 1 || selected > options.length) {
-          showToast('Некорректный номер слота', 'err');
-          return null;
+        if (!rescheduleModalEls.backdrop || !rescheduleModalEls.slotList) {
+          const options = slots.slice(0, 15).map((slot, idx) => (idx + 1) + '. ' + formatDateRange(slot.start_at, slot.end_at));
+          const input = prompt('Выберите номер нового слота (1-' + options.length + '):\\n\\n' + options.join('\\n'), '1');
+          if (input === null) return null;
+          const selected = Number(input.trim());
+          if (!Number.isFinite(selected) || selected < 1 || selected > options.length) {
+            showToast('Некорректный номер слота', 'err');
+            return null;
+          }
+          return slots[selected - 1];
         }
-        return slots[selected - 1];
+
+        return new Promise((resolve) => {
+          rescheduleModalResolver = resolve;
+          rescheduleModalEls.slotList.innerHTML = '';
+          slots.slice(0, 20).forEach((slot, idx) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'template-btn';
+            btn.textContent = (idx + 1) + '. ' + formatDateRange(slot.start_at, slot.end_at);
+            btn.onclick = () => closeRescheduleModal(slot);
+            rescheduleModalEls.slotList.appendChild(btn);
+          });
+          rescheduleModalEls.backdrop.classList.remove('hidden');
+        });
       }
 
       function switchTab(tab) {
@@ -1085,6 +1175,7 @@ export function renderMiniAppHtml(): string {
               cancelBtn.onclick = async () => {
                 try {
                   await api('/api/webapp/requests/' + r.id + '/cancel', { method: 'POST', body: '{}' });
+                  clearRequestCaches();
                   await loadMyRequests();
                 } catch (error) {
                   showActionError(error);
@@ -1104,6 +1195,7 @@ export function renderMiniAppHtml(): string {
                     method: 'POST',
                     body: JSON.stringify({ start_at: slot.start_at, end_at: slot.end_at })
                   });
+                  clearRequestCaches();
                   showToast('Заявка перенесена', 'ok');
                   await loadMyRequests();
                 } catch (error) {
@@ -1128,6 +1220,7 @@ export function renderMiniAppHtml(): string {
                     method: 'POST',
                     body: JSON.stringify({ comment: reply.comment })
                   });
+                  clearRequestCaches();
                 }
               },
               {
@@ -1141,6 +1234,7 @@ export function renderMiniAppHtml(): string {
                     method: 'POST',
                     body: JSON.stringify({ comment: reply.comment })
                   });
+                  clearRequestCaches();
                 }
               },
               {
@@ -1154,6 +1248,7 @@ export function renderMiniAppHtml(): string {
                     method: 'POST',
                     body: JSON.stringify({ comment: reply.comment })
                   });
+                  clearRequestCaches();
                 }
               },
               {
@@ -1173,6 +1268,7 @@ export function renderMiniAppHtml(): string {
                       comment: reply.comment
                     })
                   });
+                  clearRequestCaches();
                   showToast('Заявка перенесена', 'ok');
                 }
               }
@@ -1226,7 +1322,10 @@ export function renderMiniAppHtml(): string {
       }
 
       async function loadMyRequests() {
-        const data = await api('/api/webapp/requests/my');
+        const cacheKey = 'miniapp_cache_my_requests';
+        const cached = loadCachedJson(cacheKey);
+        const data = cached || (await api('/api/webapp/requests/my'));
+        if (!cached) saveCachedJson(cacheKey, data);
         const all = data.requests || [];
         const closedCount = all.filter((r) => ['REJECTED', 'CANCELLED', 'EXPIRED'].includes(String(r.status || ''))).length;
         const myCounts = {
@@ -1272,7 +1371,11 @@ export function renderMiniAppHtml(): string {
         if (from) params.set('from', new Date(from + 'T00:00:00.000Z').toISOString());
         if (to) params.set('to', new Date(to + 'T23:59:59.999Z').toISOString());
 
-        const data = await api('/api/webapp/admin/requests?' + params.toString());
+        const reqUrl = '/api/webapp/admin/requests?' + params.toString();
+        const cacheKey = 'miniapp_cache_admin_requests_' + params.toString();
+        const cached = loadCachedJson(cacheKey);
+        const data = cached || (await api(reqUrl));
+        if (!cached) saveCachedJson(cacheKey, data);
         const all = data.requests || [];
         const adminCounts = {
           '': all.length,
@@ -1371,6 +1474,7 @@ export function renderMiniAppHtml(): string {
       }
 
       async function bootstrap() {
+        setLoading(true);
         const hashParams = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
         const queryParams = new URLSearchParams(window.location.search || '');
         const initDataFromUrl = hashParams.get('tgWebAppData') || queryParams.get('tgWebAppData') || '';
@@ -1393,7 +1497,9 @@ export function renderMiniAppHtml(): string {
         }
 
         token = auth.token;
-        const data = await api('/api/webapp/bootstrap');
+        const bootstrapCached = loadCachedJson('miniapp_cache_bootstrap', 20000);
+        const data = bootstrapCached || (await api('/api/webapp/bootstrap'));
+        if (!bootstrapCached) saveCachedJson('miniapp_cache_bootstrap', data);
         role = data.role;
 
         const user = data.user || {};
@@ -1484,6 +1590,7 @@ export function renderMiniAppHtml(): string {
         }
 
         els.appRoot.classList.remove('hidden');
+        setLoading(false);
         setStatus(browserDevMode ? 'Подключено (локальный режим)' : 'Подключено', 'ok');
       }
 
@@ -1528,7 +1635,10 @@ export function renderMiniAppHtml(): string {
         };
 
         const duration = Number(els.fDuration.value || 30);
-        const data = await api('/api/webapp/slots?duration=' + duration);
+        const slotKey = 'miniapp_cache_slots_' + duration;
+        const slotCached = loadCachedJson(slotKey, 12000);
+        const data = slotCached || (await api('/api/webapp/slots?duration=' + duration));
+        if (!slotCached) saveCachedJson(slotKey, data);
         slotsCache = data.slots || [];
         selectedSlotIndex = null;
         selectedWeekId = null;
@@ -1652,6 +1762,7 @@ export function renderMiniAppHtml(): string {
             location: els.fFormat.value === 'OFFLINE' ? (els.fLocation.value || null) : null
           })
         });
+        clearRequestCaches();
         selectedSlotIndex = null;
         selectedWeekId = null;
         selectedDayKey = null;
@@ -1716,6 +1827,7 @@ export function renderMiniAppHtml(): string {
         }
         if (!confirm('Удалить выбранные закрытые заявки без возможности восстановления?')) return;
         const data = await cleanupRequests('selected');
+        clearRequestCaches();
         adminSelectedRequestIds.clear();
         showToast('Удалено: ' + (data.deleted_count || 0), 'ok');
         await loadAdminRequests();
@@ -1725,6 +1837,7 @@ export function renderMiniAppHtml(): string {
         const days = Number.isFinite(daysRaw) ? Math.max(1, Math.min(365, Math.floor(daysRaw))) : 7;
         if (!confirm('Удалить закрытые заявки старше ' + days + ' дней?')) return;
         const data = await cleanupRequests('closed', days);
+        clearRequestCaches();
         adminSelectedRequestIds.clear();
         showToast('Удалено: ' + (data.deleted_count || 0), 'ok');
         await loadAdminRequests();
@@ -1732,6 +1845,7 @@ export function renderMiniAppHtml(): string {
       document.getElementById('btnClearAllClosed').addEventListener('click', async () => {
         if (!confirm('Удалить все закрытые заявки? Действие необратимо.')) return;
         const data = await cleanupRequests('closed', 0);
+        clearRequestCaches();
         adminSelectedRequestIds.clear();
         showToast('Удалено: ' + (data.deleted_count || 0), 'ok');
         await loadAdminRequests();
@@ -1760,6 +1874,7 @@ export function renderMiniAppHtml(): string {
             slot_min_lead_hours: Number(els.sLead.value)
           })
         });
+        clearRequestCaches();
         showToast('Настройки сохранены', 'ok');
       });
       document.getElementById('btnReloadOAuthStatus').addEventListener('click', async () => {
@@ -1783,6 +1898,14 @@ export function renderMiniAppHtml(): string {
         replyModalResolver = null;
         if (resolver) resolver(payload);
       }
+      function closeRescheduleModal(slot) {
+        if (rescheduleModalEls.backdrop) {
+          rescheduleModalEls.backdrop.classList.add('hidden');
+        }
+        const resolver = rescheduleModalResolver;
+        rescheduleModalResolver = null;
+        if (resolver) resolver(slot || null);
+      }
 
       modalEls.cancel.addEventListener('click', () => closeReplyModal({ cancelled: true, comment: null }));
       modalEls.submit.addEventListener('click', () => {
@@ -1794,8 +1917,19 @@ export function renderMiniAppHtml(): string {
           closeReplyModal({ cancelled: true, comment: null });
         }
       });
+      if (rescheduleModalEls.cancel) {
+        rescheduleModalEls.cancel.addEventListener('click', () => closeRescheduleModal(null));
+      }
+      if (rescheduleModalEls.backdrop) {
+        rescheduleModalEls.backdrop.addEventListener('click', (event) => {
+          if (event.target === rescheduleModalEls.backdrop) {
+            closeRescheduleModal(null);
+          }
+        });
+      }
 
       bootstrap().catch((error) => {
+        setLoading(false);
         const message = error && error.message ? error.message : 'unknown';
         if (message === 'MINI_APP_BROWSER_AUTH_DISABLED') {
           setStatus('Откройте mini app из Telegram (кнопка бота). Веб-доступ без Telegram отключен.', 'err');
