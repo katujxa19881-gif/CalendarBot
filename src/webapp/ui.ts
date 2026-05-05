@@ -395,6 +395,7 @@ export function renderMiniAppHtml(): string {
           <label>Описание <textarea id="fDescription"></textarea></label>
           <label id="locationWrap" class="hidden">Место/адрес <input id="fLocation" /></label>
           <button id="btnSubmitRequest" class="primary">Отправить заявку</button>
+          <div id="newRequestHint" class="muted">Заполните шаги 1–4 для отправки заявки.</div>
         </div>
       </section>
 
@@ -529,6 +530,8 @@ export function renderMiniAppHtml(): string {
         fTopic: document.getElementById('fTopic'),
         fDescription: document.getElementById('fDescription'),
         fLocation: document.getElementById('fLocation'),
+        btnSubmitRequest: document.getElementById('btnSubmitRequest'),
+        newRequestHint: document.getElementById('newRequestHint'),
         locationWrap: document.getElementById('locationWrap'),
         sStart: document.getElementById('sStart'),
         sEnd: document.getElementById('sEnd'),
@@ -735,6 +738,19 @@ export function renderMiniAppHtml(): string {
           const nodeStep = Number(node.getAttribute('data-new-step') || '1');
           node.classList.toggle('active', nodeStep === step);
         });
+
+        const missing = [];
+        if (!hasFormat) missing.push('выберите формат и длительность');
+        if (!hasSlot) missing.push('выберите слот');
+        if (!hasContacts) missing.push('заполните имя, фамилию, email и тему');
+        if (els.fFormat.value === 'OFFLINE' && !(els.fLocation.value || '').trim()) {
+          missing.push('укажите место встречи');
+        }
+        const isReady = missing.length === 0;
+        els.btnSubmitRequest.disabled = !isReady;
+        els.newRequestHint.textContent = isReady
+          ? 'Готово к отправке.'
+          : 'До отправки: ' + missing[0] + '.';
       }
 
       async function ensureAdminUnlocked() {
@@ -1139,7 +1155,7 @@ export function renderMiniAppHtml(): string {
         updateNewRequestProgress();
       });
       els.fDuration.addEventListener('change', updateNewRequestProgress);
-      ['fFirstName', 'fLastName', 'fEmail', 'fTopic'].forEach((id) => {
+      ['fFirstName', 'fLastName', 'fEmail', 'fTopic', 'fLocation'].forEach((id) => {
         const input = document.getElementById(id);
         input.addEventListener('input', updateNewRequestProgress);
       });
@@ -1223,6 +1239,13 @@ export function renderMiniAppHtml(): string {
             location: els.fFormat.value === 'OFFLINE' ? (els.fLocation.value || null) : null
           })
         });
+        selectedSlotIndex = null;
+        slotsCache = [];
+        els.fSlot.innerHTML = '<div class="muted">Слоты пока не загружены.</div>';
+        els.fTopic.value = '';
+        els.fDescription.value = '';
+        els.fLocation.value = '';
+        updateNewRequestProgress();
         alert('Заявка отправлена');
         switchTab('my');
         await loadMyRequests();
