@@ -475,18 +475,8 @@ export function renderMiniAppHtml(): string {
           <button type="button" class="chip" data-admin-filter="CANCELLED">Отмененные</button>
           <button type="button" class="chip" data-admin-filter="EXPIRED">Истекшие</button>
         </div>
+        <input id="aStatus" type="hidden" value="" />
         <div class="grid2">
-          <label>Статус
-            <select id="aStatus">
-              <option value="">Все</option>
-              <option value="PENDING_APPROVAL">На согласовании</option>
-              <option value="APPROVED">Подтвержденные</option>
-              <option value="RESCHEDULED">Перенесенные</option>
-              <option value="REJECTED">Отклоненные</option>
-              <option value="CANCELLED">Отмененные</option>
-              <option value="EXPIRED">Истекшие</option>
-            </select>
-          </label>
           <label>С даты
             <input id="aFrom" type="date" />
           </label>
