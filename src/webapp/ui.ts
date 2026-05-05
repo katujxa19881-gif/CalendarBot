@@ -100,12 +100,13 @@ export function renderMiniAppHtml(): string {
       color: #9fd8ff;
       margin-right: 6px;
     }
-    .request { border: 1px solid #1b344a; border-radius: 12px; padding: 10px; margin: 8px 0; display: grid; gap: 8px; }
-    .request-head { min-height: 46px; display: grid; align-content: start; gap: 4px; }
-    .request-title { line-height: 1.3; }
+    .request { border: 1px solid #1b344a; border-radius: 12px; padding: 12px; margin: 8px 0; display: grid; gap: 8px; }
+    .request-head { min-height: 52px; display: grid; align-content: start; gap: 4px; }
+    .request-title { line-height: 1.3; display: grid; gap: 4px; }
+    .request-title strong { font-size: 17px; }
     .request-select { margin-right: 8px; transform: translateY(1px); width: 16px; height: 16px; accent-color: var(--cyan); }
     .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
-    .actions button { min-height: 44px; }
+    .actions button { min-height: 46px; font-weight: 600; }
     .actions button.ghost {
       opacity: .38;
       cursor: default;
@@ -351,10 +352,58 @@ export function renderMiniAppHtml(): string {
     .wizard-head { font-weight: 700; color: #cfe8ff; margin-bottom: 8px; }
     .wizard-summary { display: grid; gap: 6px; border: 1px solid #214661; border-radius: 10px; padding: 10px; background: rgba(9,19,32,.5); }
     .wizard-summary div { font-size: 13px; color: #c7ddf0; }
+    .wizard-submit-wrap {
+      position: sticky;
+      bottom: 0;
+      background: linear-gradient(180deg, rgba(5,7,10,.15), rgba(5,7,10,.92));
+      padding-top: 8px;
+      margin-top: 8px;
+    }
     .admin-menu { display: grid; gap: 8px; margin: 10px 0; }
     .admin-menu button { text-align: left; }
     .admin-panel { display: none; }
     .admin-panel.active { display: block; }
+    .subpanel {
+      border: 1px solid #1b344a;
+      border-radius: 12px;
+      padding: 8px 10px;
+      margin-top: 8px;
+      background: rgba(9, 19, 32, .55);
+    }
+    .subpanel > summary {
+      cursor: pointer;
+      list-style: none;
+      color: #b9dbf3;
+      font-weight: 600;
+    }
+    .subpanel > summary::-webkit-details-marker { display: none; }
+    .toast-wrap {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: calc(max(14px, env(safe-area-inset-bottom)) + 4px);
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+      z-index: 80;
+    }
+    .toast {
+      min-width: 220px;
+      max-width: min(88vw, 520px);
+      border: 1px solid #2f5977;
+      background: rgba(7, 17, 28, .95);
+      color: #dff4ff;
+      border-radius: 12px;
+      padding: 10px 12px;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, .42);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: .2s ease;
+      font-size: 14px;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.ok { border-color: #2f8d61; color: #bff7d8; }
+    .toast.err { border-color: #8a4651; color: #ffc0c7; }
   </style>
 </head>
 <body>
@@ -436,7 +485,9 @@ export function renderMiniAppHtml(): string {
           <label>Email <input id="fEmail" type="email" /></label>
         </div>
         <div id="newStep8" class="wizard-step row">
-          <button id="btnSubmitRequest" class="primary">Отправить заявку</button>
+          <div class="wizard-submit-wrap">
+            <button id="btnSubmitRequest" class="primary">Отправить заявку</button>
+          </div>
           <div id="newRequestHint" class="muted">Проверьте данные и отправьте заявку.</div>
         </div>
         <div class="wizard-nav">
@@ -511,17 +562,20 @@ export function renderMiniAppHtml(): string {
           <button type="button" class="chip" data-admin-filter="EXPIRED">Истекшие</button>
         </div>
         <input id="aStatus" type="hidden" value="" />
-        <div class="grid2">
-          <label>С даты
-            <input id="aFrom" type="date" />
-          </label>
-          <label>По дату
-            <input id="aTo" type="date" />
-          </label>
-          <label>Лимит
-            <input id="aLimit" type="number" min="1" max="100" value="30" />
-          </label>
-        </div>
+        <details id="adminAdvancedFilters" class="subpanel">
+          <summary>Доп. фильтры</summary>
+          <div class="grid2" style="margin-top:8px">
+            <label>С даты
+              <input id="aFrom" type="date" />
+            </label>
+            <label>По дату
+              <input id="aTo" type="date" />
+            </label>
+            <label>Лимит
+              <input id="aLimit" type="number" min="1" max="100" value="30" />
+            </label>
+          </div>
+        </details>
         <button id="btnReloadAdmin">Обновить</button>
         <div id="adminRequests" class="row"></div>
         </div>
@@ -534,24 +588,28 @@ export function renderMiniAppHtml(): string {
 
         <div id="adminPanelBlocks" class="admin-panel">
           <h2>Блокировка слотов</h2>
-          <div class="grid2">
-            <label>Автоочистка, дней
-              <input id="aAutoDays" type="number" min="1" max="365" value="7" />
-            </label>
-          </div>
-          <div class="grid2">
-            <label><input id="aAutoEnabled" type="checkbox" checked /> Автоочистка закрытых при открытии админки</label>
-          </div>
-          <div class="grid2">
-            <button id="btnSelectClosed">Выбрать закрытые</button>
-            <button id="btnClearSelected" class="danger">Очистить выбранные</button>
-            <button id="btnClearClosed">Очистить закрытые по сроку</button>
-            <button id="btnClearAllClosed" class="danger">Очистить все закрытые</button>
-          </div>
+          <details id="adminCleanupPanel" class="subpanel">
+            <summary>Очистка закрытых заявок</summary>
+            <div class="grid2" style="margin-top:8px">
+              <label>Автоочистка, дней
+                <input id="aAutoDays" type="number" min="1" max="365" value="7" />
+              </label>
+            </div>
+            <div class="grid2">
+              <label><input id="aAutoEnabled" type="checkbox" checked /> Автоочистка закрытых при открытии админки</label>
+            </div>
+            <div class="grid2">
+              <button id="btnSelectClosed">Выбрать закрытые</button>
+              <button id="btnClearSelected" class="danger">Очистить выбранные</button>
+              <button id="btnClearClosed">Очистить закрытые по сроку</button>
+              <button id="btnClearAllClosed" class="danger">Очистить все закрытые</button>
+            </div>
+          </details>
         </div>
       </section>
     </div>
   </div>
+  <div id="toastWrap" class="toast-wrap"><div id="toast" class="toast"></div></div>
 
   <div id="replyModalBackdrop" class="modal-backdrop hidden">
     <div class="modal">
@@ -596,6 +654,7 @@ export function renderMiniAppHtml(): string {
         myRequests: document.getElementById('myRequests'),
         myStatusFilters: document.getElementById('myStatusFilters'),
         adminStatusFilters: document.getElementById('adminStatusFilters'),
+        adminAdvancedFilters: document.getElementById('adminAdvancedFilters'),
         adminRequests: document.getElementById('adminRequests'),
         fDuration: document.getElementById('fDuration'),
         fFormat: document.getElementById('fFormat'),
@@ -625,6 +684,7 @@ export function renderMiniAppHtml(): string {
         aLimit: document.getElementById('aLimit'),
         aAutoDays: document.getElementById('aAutoDays'),
         aAutoEnabled: document.getElementById('aAutoEnabled'),
+        toast: document.getElementById('toast'),
         adminPanelRequests: document.getElementById('adminPanelRequests'),
         adminPanelSchedule: document.getElementById('adminPanelSchedule'),
         adminPanelOAuth: document.getElementById('adminPanelOAuth'),
@@ -654,6 +714,7 @@ export function renderMiniAppHtml(): string {
       let selectedDayKey = null;
       let wizardStep = 1;
       let replyModalResolver = null;
+      let toastTimer = null;
       let adminSelectedRequestIds = new Set();
       let myStatusFilter = localStorage.getItem('miniapp_my_status_filter') || 'ALL';
       let adminStatusFilter = localStorage.getItem('miniapp_admin_status_filter') || '';
@@ -762,7 +823,18 @@ export function renderMiniAppHtml(): string {
 
       function showActionError(error) {
         const message = error && error.message ? error.message : 'Неизвестная ошибка';
-        alert('Операция не выполнена: ' + message);
+        showToast('Операция не выполнена: ' + message, 'err');
+      }
+
+      function showToast(message, type) {
+        if (!els.toast) return;
+        if (toastTimer) clearTimeout(toastTimer);
+        els.toast.textContent = String(message || '');
+        els.toast.className = 'toast ' + (type === 'err' ? 'err' : type === 'ok' ? 'ok' : '');
+        requestAnimationFrame(() => els.toast.classList.add('show'));
+        toastTimer = setTimeout(() => {
+          els.toast.classList.remove('show');
+        }, 1800);
       }
 
       function applyTemplateVars(template, request) {
@@ -1295,7 +1367,7 @@ export function renderMiniAppHtml(): string {
           '<div class="muted">@' + (user.username || '-') + ' / роль: ' + (role === 'admin' ? 'админ' : 'пользователь') + '</div>',
           '<div class="hero">' +
             '<div class="hero-intro">' +
-              '<img class="hero-photo" src="/miniapp/assets/home-photo.jpeg" alt="Фото консультанта" />' +
+              '<img class="hero-photo" id="heroPhoto" src="/miniapp/assets/home-photo.jpeg" alt="Фото консультанта" />' +
               '<div>' +
                 '<strong>Запись на консультацию к Екатерине</strong>' +
                 '<div class="small muted">Онлайн-запись на консультации и разборы.</div>' +
@@ -1320,6 +1392,19 @@ export function renderMiniAppHtml(): string {
           switchTab('my');
           await loadMyRequests();
         });
+        const heroPhoto = document.getElementById('heroPhoto');
+        if (heroPhoto) {
+          heroPhoto.addEventListener('error', () => {
+            const fallback = document.createElement('div');
+            fallback.className = 'hero-photo';
+            fallback.style.display = 'grid';
+            fallback.style.placeItems = 'center';
+            fallback.style.fontWeight = '700';
+            fallback.style.color = '#b9dbf3';
+            fallback.textContent = 'ЕК';
+            heroPhoto.replaceWith(fallback);
+          }, { once: true });
+        }
 
         if (role === 'admin') {
           els.tabAdmin.classList.remove('hidden');
@@ -1501,7 +1586,7 @@ export function renderMiniAppHtml(): string {
       });
       els.btnWizardNext.addEventListener('click', async () => {
         if (!canGoNext(wizardStep)) {
-          alert('Заполните текущий шаг.');
+          showToast('Заполните текущий шаг', 'err');
           return;
         }
         if (wizardStep === 3 && !slotsCache.length) {
@@ -1514,7 +1599,7 @@ export function renderMiniAppHtml(): string {
       document.getElementById('btnSubmitRequest').addEventListener('click', async () => {
         const slot = selectedSlotIndex === null ? null : slotsCache[selectedSlotIndex];
         if (!slot) {
-          alert('Сначала выбери слот');
+          showToast('Сначала выберите слот', 'err');
           return;
         }
         await api('/api/webapp/requests', {
@@ -1544,7 +1629,7 @@ export function renderMiniAppHtml(): string {
         els.fLocation.value = '';
         wizardStep = 1;
         updateWizardUi();
-        alert('Заявка отправлена');
+        showToast('Заявка отправлена', 'ok');
         switchTab('my');
         await loadMyRequests();
       });
@@ -1591,13 +1676,13 @@ export function renderMiniAppHtml(): string {
       });
       document.getElementById('btnClearSelected').addEventListener('click', async () => {
         if (!adminSelectedRequestIds.size) {
-          alert('Нет выбранных заявок для очистки');
+          showToast('Нет выбранных заявок для очистки', 'err');
           return;
         }
         if (!confirm('Удалить выбранные закрытые заявки без возможности восстановления?')) return;
         const data = await cleanupRequests('selected');
         adminSelectedRequestIds.clear();
-        alert('Удалено: ' + (data.deleted_count || 0));
+        showToast('Удалено: ' + (data.deleted_count || 0), 'ok');
         await loadAdminRequests();
       });
       document.getElementById('btnClearClosed').addEventListener('click', async () => {
@@ -1606,14 +1691,14 @@ export function renderMiniAppHtml(): string {
         if (!confirm('Удалить закрытые заявки старше ' + days + ' дней?')) return;
         const data = await cleanupRequests('closed', days);
         adminSelectedRequestIds.clear();
-        alert('Удалено: ' + (data.deleted_count || 0));
+        showToast('Удалено: ' + (data.deleted_count || 0), 'ok');
         await loadAdminRequests();
       });
       document.getElementById('btnClearAllClosed').addEventListener('click', async () => {
         if (!confirm('Удалить все закрытые заявки? Действие необратимо.')) return;
         const data = await cleanupRequests('closed', 0);
         adminSelectedRequestIds.clear();
-        alert('Удалено: ' + (data.deleted_count || 0));
+        showToast('Удалено: ' + (data.deleted_count || 0), 'ok');
         await loadAdminRequests();
       });
 
@@ -1625,7 +1710,7 @@ export function renderMiniAppHtml(): string {
           }
         });
         if (!workdays.length) {
-          alert('Выберите хотя бы один рабочий день');
+          showToast('Выберите хотя бы один рабочий день', 'err');
           return;
         }
         await api('/api/webapp/admin/settings', {
@@ -1640,7 +1725,7 @@ export function renderMiniAppHtml(): string {
             slot_min_lead_hours: Number(els.sLead.value)
           })
         });
-        alert('Настройки сохранены');
+        showToast('Настройки сохранены', 'ok');
       });
       document.getElementById('btnReloadOAuthStatus').addEventListener('click', async () => {
         await loadGoogleOAuthStatus();
