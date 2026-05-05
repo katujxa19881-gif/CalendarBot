@@ -402,6 +402,46 @@ export function renderMiniAppHtml(): string {
       grid-template-columns: 1fr;
       gap: 8px;
     }
+    .quick-edit-panel {
+      border: 1px solid #1f4f6f;
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(8, 20, 35, .55);
+      display: grid;
+      gap: 10px;
+    }
+    .quick-edit-panel h3 {
+      margin: 0;
+      font-size: 14px;
+      color: #b9dbf3;
+    }
+    .quick-edit-panel .grid2 {
+      gap: 10px;
+    }
+    .quick-edit-panel input,
+    .quick-edit-panel select,
+    .quick-edit-panel textarea {
+      min-height: 42px;
+      font-size: 14px;
+    }
+    .quick-edit-panel textarea {
+      min-height: 84px;
+    }
+    .quick-edit-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .quick-edit-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .quick-edit-grid button {
+      font-size: 12px;
+      padding: 8px 10px;
+      min-height: 40px;
+    }
     .wizard-submit-wrap {
       position: sticky;
       bottom: max(10px, env(safe-area-inset-bottom));
@@ -548,8 +588,43 @@ export function renderMiniAppHtml(): string {
         <div id="newStep8" class="wizard-step row step-review">
           <div id="newSummaryFinal" class="wizard-summary"></div>
           <div class="review-note">Проверьте информацию перед отправкой. Если нужно изменить данные, нажмите «Подкорректировать».</div>
+          <div class="quick-edit-grid">
+            <button id="btnEditTopic" type="button">Изменить тему</button>
+            <button id="btnEditDescription" type="button">Изменить комментарий</button>
+            <button id="btnEditDuration" type="button">Изменить длительность</button>
+            <button id="btnEditFormat" type="button">Изменить формат</button>
+            <button id="btnEditSlot" type="button">Изменить слот</button>
+            <button id="btnEditEmail" type="button">Изменить email</button>
+          </div>
           <div class="wizard-edit-row">
             <button id="btnEditBeforeSubmit">Подкорректировать</button>
+          </div>
+          <div id="quickEditPanel" class="quick-edit-panel hidden">
+            <h3>Быстрая корректировка</h3>
+            <label>Тема <input id="qeTopic" /></label>
+            <label>Комментарий <textarea id="qeDescription"></textarea></label>
+            <div class="grid2">
+              <label>Длительность
+                <select id="qeDuration">
+                  <option value="15">15 мин</option>
+                  <option value="30">30 мин</option>
+                  <option value="45">45 мин</option>
+                  <option value="60">60 мин</option>
+                  <option value="90">90 мин</option>
+                </select>
+              </label>
+              <label>Формат
+                <select id="qeFormat">
+                  <option value="ONLINE">Онлайн</option>
+                  <option value="OFFLINE">Оффлайн</option>
+                </select>
+              </label>
+            </div>
+            <label>Email <input id="qeEmail" type="email" /></label>
+            <div class="quick-edit-actions">
+              <button id="btnQuickEditCancel" type="button">Отмена</button>
+              <button id="btnQuickEditApply" class="primary" type="button">Применить</button>
+            </div>
           </div>
           <div class="wizard-submit-wrap">
             <button id="btnSubmitRequest" class="primary">Отправить заявку</button>
@@ -729,6 +804,20 @@ export function renderMiniAppHtml(): string {
         btnWizardNext: document.getElementById('btnWizardNext'),
         btnWizardExit: document.getElementById('btnWizardExit'),
         btnEditBeforeSubmit: document.getElementById('btnEditBeforeSubmit'),
+        quickEditPanel: document.getElementById('quickEditPanel'),
+        qeTopic: document.getElementById('qeTopic'),
+        qeDescription: document.getElementById('qeDescription'),
+        qeDuration: document.getElementById('qeDuration'),
+        qeFormat: document.getElementById('qeFormat'),
+        qeEmail: document.getElementById('qeEmail'),
+        btnQuickEditCancel: document.getElementById('btnQuickEditCancel'),
+        btnQuickEditApply: document.getElementById('btnQuickEditApply'),
+        btnEditTopic: document.getElementById('btnEditTopic'),
+        btnEditDescription: document.getElementById('btnEditDescription'),
+        btnEditDuration: document.getElementById('btnEditDuration'),
+        btnEditFormat: document.getElementById('btnEditFormat'),
+        btnEditSlot: document.getElementById('btnEditSlot'),
+        btnEditEmail: document.getElementById('btnEditEmail'),
         btnOpenNewFromMy: document.getElementById('btnOpenNewFromMy'),
         btnOpenAdminFromMy: document.getElementById('btnOpenAdminFromMy'),
         newSummary: document.getElementById('newSummary'),
@@ -1136,6 +1225,35 @@ export function renderMiniAppHtml(): string {
         els.btnWizardBack.disabled = wizardStep === 1;
         els.btnWizardNext.classList.toggle('hidden', wizardStep === 8);
         if (wizardStep === 7 || wizardStep === 8) renderWizardSummary();
+        if (wizardStep !== 8 && els.quickEditPanel) {
+          els.quickEditPanel.classList.add('hidden');
+        }
+      }
+
+      function fillQuickEditPanelFromForm() {
+        if (!els.quickEditPanel) return;
+        els.qeTopic.value = els.fTopic.value || '';
+        els.qeDescription.value = els.fDescription.value || '';
+        els.qeDuration.value = els.fDuration.value || '30';
+        els.qeFormat.value = els.fFormat.value || 'ONLINE';
+        els.qeEmail.value = els.fEmail.value || '';
+      }
+
+      function applyQuickEditToForm() {
+        const topic = (els.qeTopic.value || '').trim();
+        if (topic.length < 3) {
+          showToast('Тема должна быть не короче 3 символов', 'err');
+          return false;
+        }
+        els.fTopic.value = topic;
+        els.fDescription.value = (els.qeDescription.value || '').trim();
+        els.fDuration.value = els.qeDuration.value || '30';
+        els.fFormat.value = els.qeFormat.value || 'ONLINE';
+        els.fEmail.value = (els.qeEmail.value || '').trim();
+        els.locationWrap.classList.toggle('hidden', els.fFormat.value !== 'OFFLINE');
+        renderWizardSummary();
+        clearSlotCaches();
+        return true;
       }
 
       function canGoNext(step) {
@@ -1815,6 +1933,55 @@ export function renderMiniAppHtml(): string {
       });
       if (els.btnEditBeforeSubmit) {
         els.btnEditBeforeSubmit.addEventListener('click', () => {
+          fillQuickEditPanelFromForm();
+          els.quickEditPanel.classList.toggle('hidden');
+        });
+      }
+      if (els.btnQuickEditCancel) {
+        els.btnQuickEditCancel.addEventListener('click', () => {
+          els.quickEditPanel.classList.add('hidden');
+        });
+      }
+      if (els.btnQuickEditApply) {
+        els.btnQuickEditApply.addEventListener('click', async () => {
+          if (!applyQuickEditToForm()) return;
+          if (!slotsCache.length || selectedSlotIndex === null) {
+            try {
+              await document.getElementById('btnLoadSlots').click();
+            } catch (_e) {}
+          }
+          els.quickEditPanel.classList.add('hidden');
+          showToast('Изменения применены', 'ok');
+        });
+      }
+      if (els.btnEditTopic) {
+        els.btnEditTopic.addEventListener('click', () => {
+          wizardStep = 1;
+          updateWizardUi();
+        });
+      }
+      if (els.btnEditDescription) {
+        els.btnEditDescription.addEventListener('click', () => {
+          wizardStep = 2;
+          updateWizardUi();
+        });
+      }
+      if (els.btnEditDuration || els.btnEditFormat) {
+        const goStep3 = () => {
+          wizardStep = 3;
+          updateWizardUi();
+        };
+        if (els.btnEditDuration) els.btnEditDuration.addEventListener('click', goStep3);
+        if (els.btnEditFormat) els.btnEditFormat.addEventListener('click', goStep3);
+      }
+      if (els.btnEditSlot) {
+        els.btnEditSlot.addEventListener('click', () => {
+          wizardStep = 4;
+          updateWizardUi();
+        });
+      }
+      if (els.btnEditEmail) {
+        els.btnEditEmail.addEventListener('click', () => {
           wizardStep = 7;
           updateWizardUi();
         });
