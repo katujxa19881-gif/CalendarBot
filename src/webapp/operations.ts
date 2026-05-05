@@ -100,6 +100,16 @@ function formatRequestCode(createdAt: Date): string {
   return `#${hh}${mm}`;
 }
 
+function isCalendarEventMissingLikeError(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("not found") ||
+    normalized.includes("404") ||
+    normalized.includes("410") ||
+    normalized.includes("gone")
+  );
+}
+
 async function sendTelegramMessage(input: {
   chatId: string;
   text: string;
@@ -433,6 +443,7 @@ export async function cancelMeetingRequest(input: {
     throw new WebAppOperationError("REQUEST_STATUS_INVALID", `Cannot cancel request in status ${request.status}`);
   }
 
+  let calendarCancelWarning: string | null = null;
   if (request.calendarEvent?.googleCalendarEventId) {
     const calendarSyncProvider = getCalendarSyncProvider();
     if (!calendarSyncProvider) {
@@ -444,10 +455,12 @@ export async function cancelMeetingRequest(input: {
         googleCalendarEventId: request.calendarEvent.googleCalendarEventId
       });
     } catch (error) {
-      throw new WebAppOperationError(
-        "CALENDAR_SYNC_FAILED",
-        error instanceof Error ? error.message : "Calendar cancel failed"
-      );
+      const message = error instanceof Error ? error.message : "Calendar cancel failed";
+      if (isCalendarEventMissingLikeError(message)) {
+        calendarCancelWarning = message;
+      } else {
+        throw new WebAppOperationError("CALENDAR_SYNC_FAILED", message);
+      }
     }
   }
 
@@ -480,6 +493,7 @@ export async function cancelMeetingRequest(input: {
         actionType: JournalActionType.CANCELLATION_COMPLETED,
         details: {
           comment: input.comment ?? null,
+          calendar_cancel_warning: calendarCancelWarning,
           source: input.actorRole === JournalActorRole.ADMIN ? "webapp_admin" : "webapp_user",
           channel: "webapp"
         },

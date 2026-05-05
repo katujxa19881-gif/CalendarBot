@@ -388,6 +388,22 @@ export function renderMiniAppHtml(): string {
     .wizard-head { font-weight: 700; color: #cfe8ff; margin-bottom: 12px; line-height: 1.4; }
     .wizard-summary { display: grid; gap: 6px; border: 1px solid #214661; border-radius: 10px; padding: 10px; background: rgba(9,19,32,.5); }
     .wizard-summary div { font-size: 13px; color: #c7ddf0; line-height: 1.5; }
+    .wizard-summary.clickable .summary-item {
+      width: 100%;
+      text-align: left;
+      border: 1px solid transparent;
+      background: transparent;
+      padding: 6px 8px;
+      border-radius: 8px;
+      color: #c7ddf0;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .wizard-summary.clickable .summary-item:hover {
+      border-color: #255173;
+      background: rgba(14, 34, 52, .5);
+    }
+    .wizard-summary.clickable .summary-item strong { color: #e2f3ff; }
     .review-note {
       border: 1px solid #1f4f6f;
       border-radius: 12px;
@@ -1212,8 +1228,19 @@ export function renderMiniAppHtml(): string {
           '<div><strong>Когда:</strong> ' + escapeHtml(when) + '</div>',
           '<div><strong>Email:</strong> ' + escapeHtml(els.fEmail.value || '-') + '</div>'
         ].join('');
+        const clickableSummaryHtml = [
+          '<button type="button" class="summary-item" data-edit-step="1"><strong>Тема:</strong> ' + escapeHtml(els.fTopic.value || '-') + '</button>',
+          '<button type="button" class="summary-item" data-edit-step="2"><strong>Комментарий:</strong> ' + escapeHtml(els.fDescription.value || '-') + '</button>',
+          '<button type="button" class="summary-item" data-edit-step="3"><strong>Длительность:</strong> ' + escapeHtml(els.fDuration.value || '-') + ' мин</button>',
+          '<button type="button" class="summary-item" data-edit-step="3"><strong>Формат:</strong> ' + (els.fFormat.value === 'OFFLINE' ? 'Оффлайн' : 'Онлайн') + '</button>',
+          '<button type="button" class="summary-item" data-edit-step="4"><strong>Когда:</strong> ' + escapeHtml(when) + '</button>',
+          '<button type="button" class="summary-item" data-edit-step="7"><strong>Email:</strong> ' + escapeHtml(els.fEmail.value || '-') + '</button>'
+        ].join('');
         els.newSummary.innerHTML = summaryHtml;
-        if (els.newSummaryFinal) els.newSummaryFinal.innerHTML = summaryHtml;
+        if (els.newSummaryFinal) {
+          els.newSummaryFinal.classList.add('clickable');
+          els.newSummaryFinal.innerHTML = clickableSummaryHtml;
+        }
       }
 
       function updateWizardUi() {
@@ -1983,6 +2010,19 @@ export function renderMiniAppHtml(): string {
       if (els.btnEditEmail) {
         els.btnEditEmail.addEventListener('click', () => {
           wizardStep = 7;
+          updateWizardUi();
+        });
+      }
+      if (els.newSummaryFinal) {
+        els.newSummaryFinal.addEventListener('click', (event) => {
+          const target = event.target;
+          if (!(target instanceof HTMLElement)) return;
+          const button = target.closest('button[data-edit-step]');
+          if (!(button instanceof HTMLElement)) return;
+          const stepRaw = button.getAttribute('data-edit-step') || '';
+          const step = Number(stepRaw);
+          if (!Number.isFinite(step) || step < 1 || step > 7) return;
+          wizardStep = step;
           updateWizardUi();
         });
       }
