@@ -175,15 +175,47 @@ export function renderMiniAppHtml(): string {
       background: linear-gradient(135deg, rgba(0,229,255,.10), rgba(163,255,18,.08));
       margin-top: 10px;
     }
+    .hero-intro {
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 12px;
+      align-items: start;
+      margin-bottom: 8px;
+    }
     .hero-photo {
-      width: 88px;
-      height: 88px;
+      width: 92px;
+      height: 92px;
       border-radius: 12px;
       object-fit: cover;
+      object-position: center top;
       border: 1px solid #1f4f6f;
       box-shadow: 0 8px 20px rgba(0, 0, 0, .35);
-      float: right;
-      margin: 0 0 8px 10px;
+    }
+    .hero-list {
+      margin: 0;
+      padding-left: 18px;
+      color: #b9d2e6;
+      font-size: 13px;
+      line-height: 1.45;
+      display: grid;
+      gap: 4px;
+    }
+    .hero-quick {
+      margin-top: 12px;
+      display: grid;
+      gap: 8px;
+    }
+    .hero-quick button {
+      background: rgba(255, 255, 255, .04);
+      border-color: #2a4b68;
+      text-align: left;
+      padding: 10px 12px;
+    }
+    .hero-quick strong { display: block; margin-bottom: 2px; }
+    .hero-quick span { color: var(--muted); font-size: 12px; }
+    @media (max-width: 540px) {
+      .hero-intro { grid-template-columns: 84px 1fr; }
+      .hero-photo { width: 84px; height: 84px; }
     }
     .modal-backdrop {
       position: fixed;
@@ -884,8 +916,33 @@ export function renderMiniAppHtml(): string {
         els.profileBlock.innerHTML = [
           '<div><strong>' + (user.first_name || '-') + ' ' + (user.last_name || '') + '</strong></div>',
           '<div class="muted">@' + (user.username || '-') + ' / роль: ' + (role === 'admin' ? 'админ' : 'пользователь') + '</div>',
-          '<div class="hero"><img class="hero-photo" src="/miniapp/assets/home-photo.jpeg" alt="Фото консультанта" /><strong>Запись на консультацию к Екатерине</strong><div class="small muted">Здесь можно быстро выбрать удобное время и записаться на консультацию по AI-вайбкодингу и финансовому планированию с ИИ. Создайте заявку, выберите слот и отслеживайте статус в одном месте.</div><div style="clear:both"></div></div>'
+          '<div class="hero">' +
+            '<div class="hero-intro">' +
+              '<img class="hero-photo" src="/miniapp/assets/home-photo.jpeg" alt="Фото консультанта" />' +
+              '<div>' +
+                '<strong>Запись на консультацию к Екатерине</strong>' +
+                '<div class="small muted">Онлайн-запись на консультации и разборы.</div>' +
+              '</div>' +
+            '</div>' +
+            '<ul class="hero-list">' +
+              '<li>Быстро выбирайте удобный слот без переписки.</li>' +
+              '<li>Отслеживайте статус заявки в одном месте.</li>' +
+              '<li>Консультации: AI-вайбкодинг и финансовое планирование с ИИ.</li>' +
+            '</ul>' +
+            '<div class="hero-quick">' +
+              '<button id="homeGoNew" type="button"><strong>Новая заявка</strong><span>Записаться на консультацию</span></button>' +
+              '<button id="homeGoMy" type="button"><strong>Мои заявки</strong><span>Проверить статусы и действия</span></button>' +
+            '</div>' +
+          '</div>'
         ].join('');
+
+        const homeGoNew = document.getElementById('homeGoNew');
+        if (homeGoNew) homeGoNew.addEventListener('click', () => switchTab('new'));
+        const homeGoMy = document.getElementById('homeGoMy');
+        if (homeGoMy) homeGoMy.addEventListener('click', async () => {
+          switchTab('my');
+          await loadMyRequests();
+        });
 
         if (role === 'admin') {
           els.tabAdmin.classList.remove('hidden');
