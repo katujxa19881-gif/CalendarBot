@@ -1,5 +1,3 @@
-import { getMiniAppConfig } from "../env";
-
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -10,9 +8,7 @@ function escapeHtml(value: string): string {
 }
 
 export function renderMiniAppHtml(): string {
-  const config = getMiniAppConfig();
   const appTitle = "NexaMeet";
-  const onboardingEnabled = config.onboardingEnabled ? "true" : "false";
 
   return `<!doctype html>
 <html lang="ru">
@@ -47,22 +43,27 @@ export function renderMiniAppHtml(): string {
       background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
       border: 1px solid var(--line);
       border-radius: 16px;
-      padding: 14px;
-      margin-bottom: 12px;
+      padding: 18px;
+      margin-bottom: 16px;
       box-shadow: 0 0 0 1px rgba(0,229,255,.06), 0 12px 34px rgba(0,0,0,.35);
     }
     h1 { font-size: 18px; margin: 0 0 8px; letter-spacing: .2px; }
-    h2 { font-size: 15px; margin: 0 0 8px; color: var(--cyan); }
+    h2 { font-size: 15px; margin: 0 0 12px; color: var(--cyan); }
     .muted { color: var(--muted); font-size: 13px; }
-    .row { display: grid; gap: 8px; margin: 8px 0; }
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .row { display: grid; gap: 14px; margin: 14px 0; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .row > label,
+    .grid2 > label {
+      display: grid;
+      gap: 6px;
+    }
     input, select, textarea, button {
       width: 100%;
       border-radius: 12px;
       border: 1px solid #204463;
       background: #0b1627;
       color: var(--text);
-      padding: 11px 12px;
+      padding: 12px 14px;
       font-size: 14px;
     }
     textarea { min-height: 90px; resize: vertical; }
@@ -87,9 +88,31 @@ export function renderMiniAppHtml(): string {
       border-color: #7f3341;
       color: #ffacb3;
     }
-    .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
-    .tabs button { font-size: 13px; padding: 9px; }
-    .tabs button.active { border-color: var(--cyan); box-shadow: 0 0 0 1px rgba(0,229,255,.35) inset; }
+    .compact-nav {
+      position: sticky;
+      top: max(8px, env(safe-area-inset-top));
+      z-index: 20;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      padding: 10px;
+      justify-content: flex-start;
+    }
+    .compact-nav button {
+      width: auto;
+      min-width: 108px;
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(10, 22, 36, .92);
+      border-color: #2a5978;
+    }
+    .greeting-banner {
+      font-size: 14px;
+      font-weight: 600;
+      color: #d8ecff;
+      margin-bottom: 2px;
+    }
     .hidden { display: none !important; }
     .pill {
       display: inline-block;
@@ -100,12 +123,12 @@ export function renderMiniAppHtml(): string {
       color: #9fd8ff;
       margin-right: 6px;
     }
-    .request { border: 1px solid #1b344a; border-radius: 12px; padding: 12px; margin: 8px 0; display: grid; gap: 8px; }
+    .request { border: 1px solid #1b344a; border-radius: 12px; padding: 14px; margin: 12px 0; display: grid; gap: 12px; }
     .request-head { min-height: 52px; display: grid; align-content: start; gap: 4px; }
     .request-title { line-height: 1.3; display: grid; gap: 4px; }
     .request-title strong { font-size: 17px; }
     .request-select { margin-right: 8px; transform: translateY(1px); width: 16px; height: 16px; accent-color: var(--cyan); }
-    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
+    .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
     .actions button { min-height: 46px; font-weight: 600; }
     .actions button.ghost {
       opacity: .38;
@@ -203,6 +226,14 @@ export function renderMiniAppHtml(): string {
       align-items: start;
       margin-bottom: 8px;
     }
+    .hero-intro strong {
+      font-size: 18px;
+      line-height: 1.2;
+    }
+    .hero-intro .small {
+      font-size: 15px;
+      line-height: 1.35;
+    }
     .hero-photo {
       width: 92px;
       height: 92px;
@@ -216,15 +247,19 @@ export function renderMiniAppHtml(): string {
       margin: 0;
       padding-left: 18px;
       color: #b9d2e6;
-      font-size: 13px;
-      line-height: 1.45;
+      font-size: 15px;
+      line-height: 1.5;
       display: grid;
       gap: 4px;
+    }
+    #newStep3 select {
+      min-height: 52px;
+      font-size: 16px;
     }
     .hero-quick {
       margin-top: 12px;
       display: grid;
-      gap: 8px;
+      gap: 10px;
     }
     .hero-quick button {
       background: rgba(255, 255, 255, .04);
@@ -233,7 +268,7 @@ export function renderMiniAppHtml(): string {
       padding: 10px 12px;
     }
     .hero-quick strong { display: block; margin-bottom: 2px; }
-    .hero-quick span { color: var(--muted); font-size: 12px; }
+    .hero-quick span { color: var(--muted); font-size: 13px; }
     .weekday-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -347,17 +382,78 @@ export function renderMiniAppHtml(): string {
     .slot-time { color: #7af4ff; font-weight: 700; }
     .wizard-step { display: none; }
     .wizard-step.active { display: block; }
-    .wizard-nav { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+    .wizard-step.active.step-review { display: grid; gap: 10px; }
+    .wizard-nav { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 16px; }
     .wizard-nav .primary { grid-column: span 3; }
-    .wizard-head { font-weight: 700; color: #cfe8ff; margin-bottom: 8px; }
+    .wizard-head { font-weight: 700; color: #cfe8ff; margin-bottom: 12px; line-height: 1.4; }
     .wizard-summary { display: grid; gap: 6px; border: 1px solid #214661; border-radius: 10px; padding: 10px; background: rgba(9,19,32,.5); }
-    .wizard-summary div { font-size: 13px; color: #c7ddf0; }
+    .wizard-summary div { font-size: 13px; color: #c7ddf0; line-height: 1.5; }
+    .wizard-summary.clickable .summary-item {
+      width: 100%;
+      text-align: left;
+      border: 1px solid transparent;
+      background: transparent;
+      padding: 6px 8px;
+      border-radius: 8px;
+      color: #c7ddf0;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .wizard-summary.clickable .summary-item:hover {
+      border-color: #255173;
+      background: rgba(14, 34, 52, .5);
+    }
+    .wizard-summary.clickable .summary-item strong { color: #e2f3ff; }
+    .review-note {
+      border: 1px solid #1f4f6f;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(8, 20, 35, .55);
+      color: #b9d2e6;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .wizard-edit-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    .quick-edit-panel {
+      border: 1px solid #1f4f6f;
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(8, 20, 35, .55);
+      display: grid;
+      gap: 10px;
+    }
+    .quick-edit-panel h3 {
+      margin: 0;
+      font-size: 14px;
+      color: #b9dbf3;
+    }
+    .quick-edit-panel .grid2 {
+      gap: 10px;
+    }
+    .quick-edit-panel input,
+    .quick-edit-panel select,
+    .quick-edit-panel textarea {
+      min-height: 42px;
+      font-size: 14px;
+    }
+    .quick-edit-panel textarea {
+      min-height: 84px;
+    }
+    .quick-edit-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
     .wizard-submit-wrap {
       position: sticky;
-      bottom: 0;
+      bottom: max(10px, env(safe-area-inset-bottom));
       background: linear-gradient(180deg, rgba(5,7,10,.15), rgba(5,7,10,.92));
       padding-top: 8px;
-      margin-top: 8px;
+      margin-top: 4px;
     }
     .admin-menu { display: grid; gap: 8px; margin: 10px 0; }
     .admin-menu button { text-align: left; }
@@ -427,10 +523,6 @@ export function renderMiniAppHtml(): string {
 <body>
   <!-- miniapp-build: modal-v2 -->
   <div class="wrap">
-    <div class="card">
-      <h1>${escapeHtml(appTitle)}</h1>
-      <div id="status" class="muted">Подключение...</div>
-    </div>
     <div id="loadingPanel" class="card loading-panel">
       <div class="skeleton lg"></div>
       <div class="skeleton md"></div>
@@ -438,25 +530,16 @@ export function renderMiniAppHtml(): string {
       <div class="skeleton sm"></div>
     </div>
 
-    <div id="onboarding" class="card hidden">
-      <h2>Быстрый старт</h2>
-      <div class="muted">Создавайте и управляйте заявками в 2-3 нажатия.</div>
-      <div class="row">
-        <button id="btnAddHome" class="lime">Добавить на главный экран</button>
-        <button id="btnCloseOnboarding">Понятно</button>
-      </div>
-    </div>
-
     <div id="appRoot" class="hidden">
-      <div class="tabs card">
-        <button data-tab="home" class="active">Главная</button>
-        <button data-tab="new">Новая заявка</button>
-        <button data-tab="my">Мои заявки</button>
-        <button id="tabAdmin" data-tab="admin" class="hidden">Админ</button>
+      <div id="greetingBannerCard" class="card hidden">
+        <div id="greetingBanner" class="greeting-banner"></div>
+      </div>
+      <div id="compactNav" class="card compact-nav hidden">
+        <button id="compactGoHome" type="button">Главная</button>
+        <button id="compactGoMy" type="button">Мои заявки</button>
       </div>
 
       <section id="tab-home" class="card">
-        <h2>Главная</h2>
         <div id="profileBlock" class="muted"></div>
       </section>
 
@@ -508,11 +591,42 @@ export function renderMiniAppHtml(): string {
           </div>
           <label>Email <input id="fEmail" type="email" /></label>
         </div>
-        <div id="newStep8" class="wizard-step row">
+        <div id="newStep8" class="wizard-step row step-review">
+          <div id="newSummaryFinal" class="wizard-summary"></div>
+          <div class="review-note">Проверьте информацию перед отправкой. Если нужно изменить данные, нажмите «Подкорректировать».</div>
+          <div class="wizard-edit-row">
+            <button id="btnEditBeforeSubmit">Подкорректировать</button>
+          </div>
+          <div id="quickEditPanel" class="quick-edit-panel hidden">
+            <h3>Быстрая корректировка</h3>
+            <label>Тема <input id="qeTopic" /></label>
+            <label>Комментарий <textarea id="qeDescription"></textarea></label>
+            <div class="grid2">
+              <label>Длительность
+                <select id="qeDuration">
+                  <option value="15">15 мин</option>
+                  <option value="30">30 мин</option>
+                  <option value="45">45 мин</option>
+                  <option value="60">60 мин</option>
+                  <option value="90">90 мин</option>
+                </select>
+              </label>
+              <label>Формат
+                <select id="qeFormat">
+                  <option value="ONLINE">Онлайн</option>
+                  <option value="OFFLINE">Оффлайн</option>
+                </select>
+              </label>
+            </div>
+            <label>Email <input id="qeEmail" type="email" /></label>
+            <div class="quick-edit-actions">
+              <button id="btnQuickEditCancel" type="button">Отмена</button>
+              <button id="btnQuickEditApply" class="primary" type="button">Применить</button>
+            </div>
+          </div>
           <div class="wizard-submit-wrap">
             <button id="btnSubmitRequest" class="primary">Отправить заявку</button>
           </div>
-          <div id="newRequestHint" class="muted">Проверьте данные и отправьте заявку.</div>
         </div>
         <div class="wizard-nav">
           <button id="btnWizardBack">Назад</button>
@@ -523,6 +637,8 @@ export function renderMiniAppHtml(): string {
 
       <section id="tab-my" class="card hidden">
         <h2>Мои заявки</h2>
+        <button id="btnOpenNewFromMy">Новая заявка</button>
+        <button id="btnOpenAdminFromMy" class="hidden">Админ-панель</button>
         <button id="btnReloadMy">Обновить</button>
         <div class="chip-row" id="myStatusFilters">
           <button type="button" class="chip active" data-my-filter="ALL">Все</button>
@@ -665,13 +781,13 @@ export function renderMiniAppHtml(): string {
       if (tg) { tg.ready(); tg.expand(); }
 
       const els = {
-        status: document.getElementById('status'),
         loadingPanel: document.getElementById('loadingPanel'),
         appRoot: document.getElementById('appRoot'),
-        onboarding: document.getElementById('onboarding'),
-        btnAddHome: document.getElementById('btnAddHome'),
-        btnCloseOnboarding: document.getElementById('btnCloseOnboarding'),
-        tabAdmin: document.getElementById('tabAdmin'),
+        greetingBannerCard: document.getElementById('greetingBannerCard'),
+        greetingBanner: document.getElementById('greetingBanner'),
+        compactNav: document.getElementById('compactNav'),
+        compactGoHome: document.getElementById('compactGoHome'),
+        compactGoMy: document.getElementById('compactGoMy'),
         profileBlock: document.getElementById('profileBlock'),
         newWizardHead: document.getElementById('newWizardHead'),
         newStep1: document.getElementById('newStep1'),
@@ -685,7 +801,19 @@ export function renderMiniAppHtml(): string {
         btnWizardBack: document.getElementById('btnWizardBack'),
         btnWizardNext: document.getElementById('btnWizardNext'),
         btnWizardExit: document.getElementById('btnWizardExit'),
+        btnEditBeforeSubmit: document.getElementById('btnEditBeforeSubmit'),
+        quickEditPanel: document.getElementById('quickEditPanel'),
+        qeTopic: document.getElementById('qeTopic'),
+        qeDescription: document.getElementById('qeDescription'),
+        qeDuration: document.getElementById('qeDuration'),
+        qeFormat: document.getElementById('qeFormat'),
+        qeEmail: document.getElementById('qeEmail'),
+        btnQuickEditCancel: document.getElementById('btnQuickEditCancel'),
+        btnQuickEditApply: document.getElementById('btnQuickEditApply'),
+        btnOpenNewFromMy: document.getElementById('btnOpenNewFromMy'),
+        btnOpenAdminFromMy: document.getElementById('btnOpenAdminFromMy'),
         newSummary: document.getElementById('newSummary'),
+        newSummaryFinal: document.getElementById('newSummaryFinal'),
         myRequests: document.getElementById('myRequests'),
         myStatusFilters: document.getElementById('myStatusFilters'),
         adminStatusFilters: document.getElementById('adminStatusFilters'),
@@ -703,7 +831,6 @@ export function renderMiniAppHtml(): string {
         fDescription: document.getElementById('fDescription'),
         fLocation: document.getElementById('fLocation'),
         btnSubmitRequest: document.getElementById('btnSubmitRequest'),
-        newRequestHint: document.getElementById('newRequestHint'),
         locationWrap: document.getElementById('locationWrap'),
         sStart: document.getElementById('sStart'),
         sEnd: document.getElementById('sEnd'),
@@ -749,6 +876,7 @@ export function renderMiniAppHtml(): string {
 
       let token = null;
       let role = 'user';
+      let reviewJumpBackToStep8 = false;
       let slotsCache = [];
       let selectedSlotIndex = null;
       let selectedWeekId = null;
@@ -846,8 +974,10 @@ export function renderMiniAppHtml(): string {
       }
 
       function setStatus(text, type = 'muted') {
-        els.status.className = type;
-        els.status.textContent = text;
+        const node = document.getElementById('status');
+        if (!node) return;
+        node.className = type;
+        node.textContent = text;
       }
 
       async function api(url, options = {}) {
@@ -1016,12 +1146,17 @@ export function renderMiniAppHtml(): string {
       }
 
       function switchTab(tab) {
-        document.querySelectorAll('.tabs button[data-tab]').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
         ['home','new','my','admin'].forEach((t) => {
           const el = document.getElementById('tab-' + t);
           if (!el) return;
           el.classList.toggle('hidden', t !== tab);
         });
+        if (els.compactNav) {
+          els.compactNav.classList.toggle('hidden', tab === 'home');
+        }
+        if (els.greetingBannerCard) {
+          els.greetingBannerCard.classList.toggle('hidden', tab !== 'home');
+        }
         localStorage.setItem('miniapp_last_tab', tab);
       }
 
@@ -1062,7 +1197,7 @@ export function renderMiniAppHtml(): string {
       function renderWizardSummary() {
         const slot = selectedSlotIndex === null ? null : slotsCache[selectedSlotIndex];
         const when = slot ? formatDateRange(slot.start_at, slot.end_at) : 'не выбрано';
-        els.newSummary.innerHTML = [
+        const summaryHtml = [
           '<div><strong>Тема:</strong> ' + escapeHtml(els.fTopic.value || '-') + '</div>',
           '<div><strong>Комментарий:</strong> ' + escapeHtml(els.fDescription.value || '-') + '</div>',
           '<div><strong>Длительность:</strong> ' + escapeHtml(els.fDuration.value || '-') + ' мин</div>',
@@ -1070,6 +1205,19 @@ export function renderMiniAppHtml(): string {
           '<div><strong>Когда:</strong> ' + escapeHtml(when) + '</div>',
           '<div><strong>Email:</strong> ' + escapeHtml(els.fEmail.value || '-') + '</div>'
         ].join('');
+        const clickableSummaryHtml = [
+          '<button type="button" class="summary-item" data-edit-step="1"><strong>Тема:</strong> ' + escapeHtml(els.fTopic.value || '-') + '</button>',
+          '<button type="button" class="summary-item" data-edit-step="2"><strong>Комментарий:</strong> ' + escapeHtml(els.fDescription.value || '-') + '</button>',
+          '<button type="button" class="summary-item" data-edit-step="3"><strong>Длительность:</strong> ' + escapeHtml(els.fDuration.value || '-') + ' мин</button>',
+          '<button type="button" class="summary-item" data-edit-step="3"><strong>Формат:</strong> ' + (els.fFormat.value === 'OFFLINE' ? 'Оффлайн' : 'Онлайн') + '</button>',
+          '<button type="button" class="summary-item" data-edit-step="4"><strong>Когда:</strong> ' + escapeHtml(when) + '</button>',
+          '<button type="button" class="summary-item" data-edit-step="7"><strong>Email:</strong> ' + escapeHtml(els.fEmail.value || '-') + '</button>'
+        ].join('');
+        els.newSummary.innerHTML = summaryHtml;
+        if (els.newSummaryFinal) {
+          els.newSummaryFinal.classList.add('clickable');
+          els.newSummaryFinal.innerHTML = clickableSummaryHtml;
+        }
       }
 
       function updateWizardUi() {
@@ -1081,10 +1229,39 @@ export function renderMiniAppHtml(): string {
         els.btnWizardBack.disabled = wizardStep === 1;
         els.btnWizardNext.classList.toggle('hidden', wizardStep === 8);
         if (wizardStep === 7 || wizardStep === 8) renderWizardSummary();
+        if (wizardStep !== 8 && els.quickEditPanel) {
+          els.quickEditPanel.classList.add('hidden');
+        }
+      }
+
+      function fillQuickEditPanelFromForm() {
+        if (!els.quickEditPanel) return;
+        els.qeTopic.value = els.fTopic.value || '';
+        els.qeDescription.value = els.fDescription.value || '';
+        els.qeDuration.value = els.fDuration.value || '30';
+        els.qeFormat.value = els.fFormat.value || 'ONLINE';
+        els.qeEmail.value = els.fEmail.value || '';
+      }
+
+      function applyQuickEditToForm() {
+        const topic = (els.qeTopic.value || '').trim();
+        if (topic.length < 3) {
+          showToast('Тема должна быть не короче 3 символов', 'err');
+          return false;
+        }
+        els.fTopic.value = topic;
+        els.fDescription.value = (els.qeDescription.value || '').trim();
+        els.fDuration.value = els.qeDuration.value || '30';
+        els.fFormat.value = els.qeFormat.value || 'ONLINE';
+        els.fEmail.value = (els.qeEmail.value || '').trim();
+        els.locationWrap.classList.toggle('hidden', els.fFormat.value !== 'OFFLINE');
+        renderWizardSummary();
+        clearSlotCaches();
+        return true;
       }
 
       function canGoNext(step) {
-        if (step === 1) return Boolean((els.fTopic.value || '').trim());
+        if (step === 1) return (els.fTopic.value || '').trim().length >= 3;
         if (step === 3) return Boolean((els.fDuration.value || '').trim() && (els.fFormat.value || '').trim());
         if (step === 4) return Boolean(selectedWeekId);
         if (step === 5) return Boolean(selectedDayKey);
@@ -1173,13 +1350,18 @@ export function renderMiniAppHtml(): string {
               cancelBtn.textContent = 'Отменить';
               cancelBtn.className = 'danger';
               cancelBtn.onclick = async () => {
+                if (cancelBtn.disabled) return;
+                cancelBtn.disabled = true;
                 try {
                   await api('/api/webapp/requests/' + r.id + '/cancel', { method: 'POST', body: '{}' });
                   clearRequestCaches();
+                  showToast('Заявка отменена', 'ok');
                   await loadMyRequests();
                 } catch (error) {
                   showActionError(error);
                   await loadMyRequests();
+                } finally {
+                  cancelBtn.disabled = false;
                 }
               };
               actions.appendChild(cancelBtn);
@@ -1503,9 +1685,11 @@ export function renderMiniAppHtml(): string {
         role = data.role;
 
         const user = data.user || {};
+        const userName = [user.first_name || '', user.last_name || ''].join(' ').trim() || 'друг';
+        if (els.greetingBannerCard && els.greetingBanner) {
+          els.greetingBanner.textContent = 'Здравствуйте, ' + userName + '!';
+        }
         els.profileBlock.innerHTML = [
-          '<div><strong>' + (user.first_name || '-') + ' ' + (user.last_name || '') + '</strong></div>',
-          '<div class="muted">@' + (user.username || '-') + ' / роль: ' + (role === 'admin' ? 'админ' : 'пользователь') + '</div>',
           '<div class="hero">' +
             '<div class="hero-intro">' +
               '<img class="hero-photo" id="heroPhoto" src="/miniapp/assets/home-photo.jpeg" alt="Фото консультанта" />' +
@@ -1521,11 +1705,10 @@ export function renderMiniAppHtml(): string {
             '</ul>' +
             '<div class="hero-quick">' +
               '<button id="homeGoNew" type="button"><strong>Новая заявка</strong><span>Записаться на консультацию</span></button>' +
-              '<button id="homeGoMy" type="button"><strong>Мои заявки</strong><span>Проверить статусы и действия</span></button>' +
+              '<button id="homeGoMy" type="button"><strong>Мои заявки</strong><span>Посмотреть статусы заявок</span></button>' +
             '</div>' +
           '</div>'
         ].join('');
-
         const homeGoNew = document.getElementById('homeGoNew');
         if (homeGoNew) homeGoNew.addEventListener('click', () => switchTab('new'));
         const homeGoMy = document.getElementById('homeGoMy');
@@ -1548,12 +1731,10 @@ export function renderMiniAppHtml(): string {
         }
 
         if (role === 'admin') {
-          els.tabAdmin.classList.remove('hidden');
+          if (els.btnOpenAdminFromMy) {
+            els.btnOpenAdminFromMy.classList.remove('hidden');
+          }
           renderAdminTemplatePreview();
-        }
-
-        if (${onboardingEnabled} && localStorage.getItem('miniapp_onboarding_done') !== '1') {
-          els.onboarding.classList.remove('hidden');
         }
 
         els.fFirstName.value = user.first_name || '';
@@ -1594,20 +1775,30 @@ export function renderMiniAppHtml(): string {
         setStatus(browserDevMode ? 'Подключено (локальный режим)' : 'Подключено', 'ok');
       }
 
-      document.querySelectorAll('.tabs button[data-tab]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          if (btn.dataset.tab === 'admin') {
-            const unlocked = await ensureAdminUnlocked();
-            if (!unlocked) return;
-            await runAutoCleanupIfEnabled();
-            await loadAdminRequests();
-            await loadAdminSettings();
-            await loadGoogleOAuthStatus();
-            switchAdminPanel('requests');
-          }
-          switchTab(btn.dataset.tab);
+      if (els.compactGoHome) {
+        els.compactGoHome.addEventListener('click', () => switchTab('home'));
+      }
+      if (els.compactGoMy) {
+        els.compactGoMy.addEventListener('click', async () => {
+          switchTab('my');
+          await loadMyRequests();
         });
-      });
+      }
+      if (els.btnOpenNewFromMy) {
+        els.btnOpenNewFromMy.addEventListener('click', () => switchTab('new'));
+      }
+      if (els.btnOpenAdminFromMy) {
+        els.btnOpenAdminFromMy.addEventListener('click', async () => {
+          const unlocked = await ensureAdminUnlocked();
+          if (!unlocked) return;
+          await runAutoCleanupIfEnabled();
+          await loadAdminRequests();
+          await loadAdminSettings();
+          await loadGoogleOAuthStatus();
+          switchAdminPanel('requests');
+          switchTab('admin');
+        });
+      }
       els.adminMenuRequests.addEventListener('click', () => switchAdminPanel('requests'));
       els.adminMenuSchedule.addEventListener('click', () => switchAdminPanel('schedule'));
       els.adminMenuOAuth.addEventListener('click', () => switchAdminPanel('oauth'));
@@ -1721,25 +1912,77 @@ export function renderMiniAppHtml(): string {
       });
 
       els.btnWizardBack.addEventListener('click', () => {
+        reviewJumpBackToStep8 = false;
         wizardStep = Math.max(1, wizardStep - 1);
         updateWizardUi();
       });
       els.btnWizardExit.addEventListener('click', () => {
+        reviewJumpBackToStep8 = false;
         wizardStep = 1;
         switchTab('home');
         updateWizardUi();
       });
       els.btnWizardNext.addEventListener('click', async () => {
         if (!canGoNext(wizardStep)) {
+          if (wizardStep === 1) {
+            showToast('Тема должна быть не короче 3 символов', 'err');
+            return;
+          }
           showToast('Заполните текущий шаг', 'err');
           return;
         }
         if (wizardStep === 3 && !slotsCache.length) {
           await document.getElementById('btnLoadSlots').click();
         }
+        if (reviewJumpBackToStep8 && wizardStep < 8) {
+          if (wizardStep === 3 || wizardStep === 4 || wizardStep === 5 || wizardStep === 6) {
+            reviewJumpBackToStep8 = false;
+          } else {
+            wizardStep = 8;
+            updateWizardUi();
+            return;
+          }
+        }
         wizardStep = Math.min(8, wizardStep + 1);
         updateWizardUi();
       });
+      if (els.btnEditBeforeSubmit) {
+        els.btnEditBeforeSubmit.addEventListener('click', () => {
+          fillQuickEditPanelFromForm();
+          els.quickEditPanel.classList.toggle('hidden');
+        });
+      }
+      if (els.btnQuickEditCancel) {
+        els.btnQuickEditCancel.addEventListener('click', () => {
+          els.quickEditPanel.classList.add('hidden');
+        });
+      }
+      if (els.btnQuickEditApply) {
+        els.btnQuickEditApply.addEventListener('click', async () => {
+          if (!applyQuickEditToForm()) return;
+          if (!slotsCache.length || selectedSlotIndex === null) {
+            try {
+              await document.getElementById('btnLoadSlots').click();
+            } catch (_e) {}
+          }
+          els.quickEditPanel.classList.add('hidden');
+          showToast('Изменения применены', 'ok');
+        });
+      }
+      if (els.newSummaryFinal) {
+        els.newSummaryFinal.addEventListener('click', (event) => {
+          const target = event.target;
+          if (!(target instanceof HTMLElement)) return;
+          const button = target.closest('button[data-edit-step]');
+          if (!(button instanceof HTMLElement)) return;
+          const stepRaw = button.getAttribute('data-edit-step') || '';
+          const step = Number(stepRaw);
+          if (!Number.isFinite(step) || step < 1 || step > 7) return;
+          reviewJumpBackToStep8 = true;
+          wizardStep = step;
+          updateWizardUi();
+        });
+      }
 
       document.getElementById('btnSubmitRequest').addEventListener('click', async () => {
         const slot = selectedSlotIndex === null ? null : slotsCache[selectedSlotIndex];
@@ -1747,37 +1990,46 @@ export function renderMiniAppHtml(): string {
           showToast('Сначала выберите слот', 'err');
           return;
         }
-        await api('/api/webapp/requests', {
-          method: 'POST',
-          body: JSON.stringify({
-            duration_minutes: Number(els.fDuration.value || 30),
-            format: els.fFormat.value,
-            start_at: slot.start_at,
-            end_at: slot.end_at,
-            topic: els.fTopic.value,
-            description: els.fDescription.value || null,
-            email: els.fEmail.value,
-            first_name: els.fFirstName.value,
-            last_name: els.fLastName.value,
-            location: els.fFormat.value === 'OFFLINE' ? (els.fLocation.value || null) : null
-          })
-        });
-        clearRequestCaches();
-        selectedSlotIndex = null;
-        selectedWeekId = null;
-        selectedDayKey = null;
-        slotsCache = [];
-        els.fWeekList.innerHTML = '<div class="muted">Сначала нажмите кнопку выше.</div>';
-        els.fDayList.innerHTML = '<div class="muted">Выберите неделю.</div>';
-        els.fTimeList.innerHTML = '<div class="muted">Выберите день.</div>';
-        els.fTopic.value = '';
-        els.fDescription.value = '';
-        els.fLocation.value = '';
-        wizardStep = 1;
-        updateWizardUi();
-        showToast('Заявка отправлена', 'ok');
-        switchTab('my');
-        await loadMyRequests();
+        if ((els.fTopic.value || '').trim().length < 3) {
+          showToast('Тема должна быть не короче 3 символов', 'err');
+          return;
+        }
+        try {
+          await api('/api/webapp/requests', {
+            method: 'POST',
+            body: JSON.stringify({
+              duration_minutes: Number(els.fDuration.value || 30),
+              format: els.fFormat.value,
+              start_at: slot.start_at,
+              end_at: slot.end_at,
+              topic: els.fTopic.value,
+              description: els.fDescription.value || null,
+              email: els.fEmail.value,
+              first_name: els.fFirstName.value,
+              last_name: els.fLastName.value,
+              location: els.fFormat.value === 'OFFLINE' ? (els.fLocation.value || null) : null
+            })
+          });
+          clearRequestCaches();
+          selectedSlotIndex = null;
+          selectedWeekId = null;
+          selectedDayKey = null;
+          slotsCache = [];
+          els.fWeekList.innerHTML = '<div class="muted">Сначала нажмите кнопку выше.</div>';
+          els.fDayList.innerHTML = '<div class="muted">Выберите неделю.</div>';
+          els.fTimeList.innerHTML = '<div class="muted">Выберите день.</div>';
+          els.fTopic.value = '';
+          els.fDescription.value = '';
+          els.fLocation.value = '';
+          reviewJumpBackToStep8 = false;
+          wizardStep = 1;
+          updateWizardUi();
+          showToast('Заявка отправлена', 'ok');
+          switchTab('my');
+          await loadMyRequests();
+        } catch (error) {
+          showActionError(error);
+        }
       });
 
       document.getElementById('btnReloadMy').addEventListener('click', () => loadMyRequests());
@@ -1822,7 +2074,17 @@ export function renderMiniAppHtml(): string {
       });
       document.getElementById('btnClearSelected').addEventListener('click', async () => {
         if (!adminSelectedRequestIds.size) {
-          showToast('Нет выбранных заявок для очистки', 'err');
+          const data = await api('/api/webapp/admin/requests?limit=100');
+          const requests = data.requests || [];
+          adminSelectedRequestIds = new Set(
+            requests.filter((r) => MANUAL_CLEAN_STATUSES.has(String(r.status || ''))).map((r) => r.id)
+          );
+          if (!adminSelectedRequestIds.size) {
+            showToast('Нет закрытых заявок для очистки', 'err');
+            return;
+          }
+          showToast('Выбраны закрытые заявки: ' + adminSelectedRequestIds.size, 'ok');
+          await loadAdminRequests();
           return;
         }
         if (!confirm('Удалить выбранные закрытые заявки без возможности восстановления?')) return;
@@ -1879,17 +2141,6 @@ export function renderMiniAppHtml(): string {
       });
       document.getElementById('btnReloadOAuthStatus').addEventListener('click', async () => {
         await loadGoogleOAuthStatus();
-      });
-
-      els.btnCloseOnboarding.addEventListener('click', () => {
-        els.onboarding.classList.add('hidden');
-        localStorage.setItem('miniapp_onboarding_done', '1');
-      });
-
-      els.btnAddHome.addEventListener('click', () => {
-        if (tg && typeof tg.addToHomeScreen === 'function') {
-          try { tg.addToHomeScreen(); } catch {}
-        }
       });
 
       function closeReplyModal(payload) {

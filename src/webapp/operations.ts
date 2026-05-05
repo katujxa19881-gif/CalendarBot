@@ -100,6 +100,16 @@ function formatRequestCode(createdAt: Date): string {
   return `#${hh}${mm}`;
 }
 
+function isCalendarEventMissingLikeError(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("not found") ||
+    normalized.includes("404") ||
+    normalized.includes("410") ||
+    normalized.includes("gone")
+  );
+}
+
 async function sendTelegramMessage(input: {
   chatId: string;
   text: string;
@@ -433,15 +443,23 @@ export async function cancelMeetingRequest(input: {
     throw new WebAppOperationError("REQUEST_STATUS_INVALID", `Cannot cancel request in status ${request.status}`);
   }
 
+  let calendarCancelWarning: string | null = null;
   if (request.calendarEvent?.googleCalendarEventId) {
     const calendarSyncProvider = getCalendarSyncProvider();
     if (!calendarSyncProvider) {
       throw new WebAppOperationError("CALENDAR_PROVIDER_MISSING", "Calendar provider is not configured");
     }
-    await calendarSyncProvider.cancelEvent({
-      externalRequestId: request.id,
-      googleCalendarEventId: request.calendarEvent.googleCalendarEventId
-    });
+    try {
+      await calendarSyncProvider.cancelEvent({
+        externalRequestId: request.id,
+        googleCalendarEventId: request.calendarEvent.googleCalendarEventId
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Calendar cancel failed";
+      calendarCancelWarning = isCalendarEventMissingLikeError(message)
+        ? message
+        : `CALENDAR_CANCEL_SOFT_FAIL: ${message}`;
+    }
   }
 
   await transitionMeetingRequestStatus({
@@ -473,6 +491,7 @@ export async function cancelMeetingRequest(input: {
         actionType: JournalActionType.CANCELLATION_COMPLETED,
         details: {
           comment: input.comment ?? null,
+          calendar_cancel_warning: calendarCancelWarning,
           source: input.actorRole === JournalActorRole.ADMIN ? "webapp_admin" : "webapp_user",
           channel: "webapp"
         },
@@ -548,19 +567,27 @@ export async function rescheduleMeetingRequest(input: {
     throw new WebAppOperationError("CALENDAR_PROVIDER_MISSING", "Calendar provider is not configured");
   }
 
-  const updatedEvent = await calendarSyncProvider.updateEvent({
-    externalRequestId: request.id,
-    googleCalendarEventId: request.calendarEvent.googleCalendarEventId,
-    topic: request.topic,
-    description: request.description ?? null,
-    format: request.format,
-    location: request.location ?? null,
-    startAt: input.newStartAt,
-    endAt: input.newEndAt,
-    attendeeEmail: request.email,
-    attendeeFirstName: request.firstName ?? null,
-    attendeeLastName: request.lastName ?? null
-  });
+  let updatedEvent;
+  try {
+    updatedEvent = await calendarSyncProvider.updateEvent({
+      externalRequestId: request.id,
+      googleCalendarEventId: request.calendarEvent.googleCalendarEventId,
+      topic: request.topic,
+      description: request.description ?? null,
+      format: request.format,
+      location: request.location ?? null,
+      startAt: input.newStartAt,
+      endAt: input.newEndAt,
+      attendeeEmail: request.email,
+      attendeeFirstName: request.firstName ?? null,
+      attendeeLastName: request.lastName ?? null
+    });
+  } catch (error) {
+    throw new WebAppOperationError(
+      "CALENDAR_SYNC_FAILED",
+      error instanceof Error ? error.message : "Calendar update failed"
+    );
+  }
 
   await transitionMeetingRequestStatus({
     meetingRequestId: request.id,
