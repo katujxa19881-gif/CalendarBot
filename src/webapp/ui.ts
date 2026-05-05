@@ -96,6 +96,7 @@ export function renderMiniAppHtml(): string {
       gap: 8px;
       align-items: center;
       padding: 10px;
+      justify-content: flex-start;
     }
     .compact-nav button {
       width: auto;
@@ -106,15 +107,9 @@ export function renderMiniAppHtml(): string {
       background: rgba(10, 22, 36, .92);
       border-color: #2a5978;
     }
-    .compact-nav .current {
-      margin-left: auto;
-      font-size: 12px;
-      color: #99b9d1;
-      padding-right: 4px;
-    }
     .greeting-banner {
-      font-size: 16px;
-      font-weight: 700;
+      font-size: 14px;
+      font-weight: 600;
       color: #d8ecff;
       margin-bottom: 2px;
     }
@@ -231,6 +226,14 @@ export function renderMiniAppHtml(): string {
       align-items: start;
       margin-bottom: 8px;
     }
+    .hero-intro strong {
+      font-size: 18px;
+      line-height: 1.2;
+    }
+    .hero-intro .small {
+      font-size: 15px;
+      line-height: 1.35;
+    }
     .hero-photo {
       width: 92px;
       height: 92px;
@@ -244,10 +247,14 @@ export function renderMiniAppHtml(): string {
       margin: 0;
       padding-left: 18px;
       color: #b9d2e6;
-      font-size: 13px;
-      line-height: 1.45;
+      font-size: 15px;
+      line-height: 1.5;
       display: grid;
       gap: 4px;
+    }
+    #newStep3 select {
+      min-height: 52px;
+      font-size: 16px;
     }
     .hero-quick {
       margin-top: 12px;
@@ -484,7 +491,6 @@ export function renderMiniAppHtml(): string {
       <div id="compactNav" class="card compact-nav hidden">
         <button id="compactGoHome" type="button">Главная</button>
         <button id="compactGoMy" type="button">Мои заявки</button>
-        <div id="compactCurrent" class="current">Новая заявка</div>
       </div>
 
       <section id="tab-home" class="card">
@@ -709,7 +715,6 @@ export function renderMiniAppHtml(): string {
         compactNav: document.getElementById('compactNav'),
         compactGoHome: document.getElementById('compactGoHome'),
         compactGoMy: document.getElementById('compactGoMy'),
-        compactCurrent: document.getElementById('compactCurrent'),
         profileBlock: document.getElementById('profileBlock'),
         newWizardHead: document.getElementById('newWizardHead'),
         newStep1: document.getElementById('newStep1'),
@@ -1067,14 +1072,8 @@ export function renderMiniAppHtml(): string {
         if (els.compactNav) {
           els.compactNav.classList.toggle('hidden', tab === 'home');
         }
-        if (els.compactCurrent) {
-          const labels = {
-            home: 'Главная',
-            new: 'Новая заявка',
-            my: 'Мои заявки',
-            admin: 'Админ'
-          };
-          els.compactCurrent.textContent = labels[tab] || '';
+        if (els.greetingBannerCard) {
+          els.greetingBannerCard.classList.toggle('hidden', tab !== 'home');
         }
         localStorage.setItem('miniapp_last_tab', tab);
       }
@@ -1567,7 +1566,6 @@ export function renderMiniAppHtml(): string {
         const userName = [user.first_name || '', user.last_name || ''].join(' ').trim() || 'друг';
         if (els.greetingBannerCard && els.greetingBanner) {
           els.greetingBanner.textContent = 'Здравствуйте, ' + userName + '!';
-          els.greetingBannerCard.classList.remove('hidden');
         }
         els.profileBlock.innerHTML = [
           '<div class="hero">' +
