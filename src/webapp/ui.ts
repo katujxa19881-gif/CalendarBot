@@ -168,6 +168,26 @@ export function renderMiniAppHtml(): string {
     }
     details.group > summary::-webkit-details-marker { display: none; }
     .group-count { color: var(--muted); font-weight: 500; margin-left: 6px; }
+    .slot-day-group {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(31, 63, 92, .7);
+    }
+    .slot-day-title {
+      font-size: 12px;
+      color: #9ec3dd;
+      margin-bottom: 6px;
+    }
+    .slot-time-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+      gap: 6px;
+    }
+    .slot-time-grid .slot-item {
+      margin: 0;
+      text-align: center;
+      padding: 9px 6px;
+    }
     .hero {
       border: 1px solid #19486a;
       border-radius: 14px;
@@ -1198,21 +1218,38 @@ export function renderMiniAppHtml(): string {
           details.className = 'group';
           if (weekIndex === 0) details.open = true;
           details.innerHTML = '<summary>' + week.label + '<span class="group-count">(' + week.items.length + ')</span></summary>';
+          const days = new Map();
+          week.items.forEach((item) => {
+            const parts = formatDateParts(item.slot.start_at);
+            const key = parts.date;
+            if (!days.has(key)) days.set(key, []);
+            days.get(key).push(item);
+          });
 
-          week.items.forEach(({ slot, index }) => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'slot-item';
-            const start = formatDateParts(slot.start_at);
-            const end = formatDateParts(slot.end_at);
-            btn.innerHTML = '<div class="slot-date">' + start.date + '</div><div class="slot-time">' + start.time + '–' + end.time + ' (МСК)</div>';
-            btn.onclick = () => {
-              selectedSlotIndex = index;
-              els.fSlot.querySelectorAll('.slot-item').forEach((n) => n.classList.remove('active'));
-              btn.classList.add('active');
-              updateNewRequestProgress();
-            };
-            details.appendChild(btn);
+          [...days.entries()].forEach(([dayLabel, dayItems]) => {
+            const dayWrap = document.createElement('div');
+            dayWrap.className = 'slot-day-group';
+            dayWrap.innerHTML = '<div class="slot-day-title">' + dayLabel + '</div>';
+
+            const grid = document.createElement('div');
+            grid.className = 'slot-time-grid';
+            dayItems.forEach(({ slot, index }) => {
+              const btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'slot-item';
+              const start = formatDateParts(slot.start_at);
+              const end = formatDateParts(slot.end_at);
+              btn.innerHTML = '<div class="slot-time">' + start.time + '–' + end.time + '</div>';
+              btn.onclick = () => {
+                selectedSlotIndex = index;
+                els.fSlot.querySelectorAll('.slot-item').forEach((n) => n.classList.remove('active'));
+                btn.classList.add('active');
+                updateNewRequestProgress();
+              };
+              grid.appendChild(btn);
+            });
+            dayWrap.appendChild(grid);
+            details.appendChild(dayWrap);
           });
           els.fSlot.appendChild(details);
         });
