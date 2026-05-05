@@ -595,6 +595,8 @@ export function renderMiniAppHtml(): string {
       let adminSelectedRequestIds = new Set();
       let myStatusFilter = localStorage.getItem('miniapp_my_status_filter') || 'ALL';
       let adminStatusFilter = localStorage.getItem('miniapp_admin_status_filter') || '';
+      let openMyGroups = new Set(JSON.parse(localStorage.getItem('miniapp_open_groups_my') || '[]'));
+      let openAdminGroups = new Set(JSON.parse(localStorage.getItem('miniapp_open_groups_admin') || '[]'));
 
       const statusLabels = {
         NEW: 'Новая',
@@ -801,6 +803,11 @@ export function renderMiniAppHtml(): string {
         return endAt.getTime() < threshold;
       }
 
+      function getOpenGroupsStore(mode) {
+        if (mode === 'admin') return { set: openAdminGroups, key: 'miniapp_open_groups_admin' };
+        return { set: openMyGroups, key: 'miniapp_open_groups_my' };
+      }
+
       function renderRequests(container, requests, mode) {
         container.innerHTML = '';
         const visibleRequests = (requests || []).filter((r) => !shouldAutoHideRequest(r, mode));
@@ -983,7 +990,13 @@ export function renderMiniAppHtml(): string {
           if (!subset.length) return;
           const details = document.createElement('details');
           details.className = 'group';
-          if (index === 0) details.open = true;
+          const openStore = getOpenGroupsStore(mode);
+          details.open = openStore.set.has(group.key) || (openStore.set.size === 0 && index === 0);
+          details.addEventListener('toggle', () => {
+            if (details.open) openStore.set.add(group.key);
+            else openStore.set.delete(group.key);
+            localStorage.setItem(openStore.key, JSON.stringify([...openStore.set]));
+          });
           details.innerHTML = '<summary>' + group.title + '<span class="group-count">(' + subset.length + ')</span></summary>';
           subset.forEach((r) => details.appendChild(renderCard(r)));
           container.appendChild(details);
