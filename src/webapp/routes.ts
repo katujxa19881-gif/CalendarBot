@@ -10,6 +10,7 @@ import { getMiniAppConfig } from "../env";
 import { logEvent } from "../logger";
 import { ensureWizardStateForUser } from "../telegram/bot";
 import { buildAvailableSlots, ensureSlotStillAvailable, isSupportedDuration } from "../application/slots";
+import { getGoogleOAuthStatus } from "../integrations/google-calendar";
 import {
   authenticateMiniApp,
   authenticateMiniAppBrowserDev,
@@ -1195,6 +1196,30 @@ export async function registerMiniAppRoutes(app: FastifyInstance): Promise<void>
     } catch (error) {
       replyOperationError(reply, error);
     }
+  });
+
+  app.get("/api/webapp/admin/google/status", async (request: FastifyRequest, reply: FastifyReply) => {
+    const miniAppConfig = getMiniAppConfig();
+    if (!miniAppConfig.enabled || !miniAppConfig.adminEnabled) {
+      reply.code(404).send({ ok: false, error: "MINI_APP_ADMIN_DISABLED" });
+      return;
+    }
+
+    const session = await requireAdminAccess(request, reply);
+    if (!session) {
+      return;
+    }
+
+    const status = await getGoogleOAuthStatus();
+    reply.code(200).send({
+      ok: true,
+      status: {
+        connected: status.connected,
+        calendar_id: status.calendarId,
+        error_code: status.errorCode,
+        error_message: status.errorMessage
+      }
+    });
   });
 
   app.post("/api/webapp/admin/requests/cleanup", async (request: FastifyRequest, reply: FastifyReply) => {

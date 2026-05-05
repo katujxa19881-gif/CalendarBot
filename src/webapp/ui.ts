@@ -230,6 +230,24 @@ export function renderMiniAppHtml(): string {
       gap: 6px;
     }
     .weekday-grid input { width: auto; margin: 0; accent-color: var(--cyan); }
+    .oauth-status {
+      border: 1px solid #214661;
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(8, 18, 30, .6);
+      display: grid;
+      gap: 5px;
+      font-size: 13px;
+    }
+    .oauth-badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 4px 8px;
+      border: 1px solid #1f4f6f;
+      width: fit-content;
+    }
+    .oauth-badge.ok { color: #7effbc; border-color: #2f8d61; }
+    .oauth-badge.err { color: #ffacb3; border-color: #8a4651; }
     @media (max-width: 540px) {
       .hero-intro { grid-template-columns: 84px 1fr; }
       .hero-photo { width: 84px; height: 84px; }
@@ -383,6 +401,9 @@ export function renderMiniAppHtml(): string {
         <div class="row">
           <button id="btnSaveSettings" class="lime">Сохранить настройки</button>
         </div>
+        <h2>Google / OAuth</h2>
+        <div class="oauth-status" id="oauthStatusBox">Загрузка статуса...</div>
+        <button id="btnReloadOAuthStatus">Обновить статус</button>
         <hr style="border-color:#173049; opacity:.5; margin:12px 0" />
         <h2>Заявки</h2>
         <div class="grid2">
@@ -471,6 +492,7 @@ export function renderMiniAppHtml(): string {
         sHorizon: document.getElementById('sHorizon'),
         sLead: document.getElementById('sLead'),
         workdaysWrap: document.getElementById('workdaysWrap'),
+        oauthStatusBox: document.getElementById('oauthStatusBox'),
         aStatus: document.getElementById('aStatus'),
         aFrom: document.getElementById('aFrom'),
         aTo: document.getElementById('aTo'),
@@ -924,6 +946,29 @@ export function renderMiniAppHtml(): string {
         });
       }
 
+      async function loadGoogleOAuthStatus() {
+        if (role !== 'admin') return;
+        try {
+          const data = await api('/api/webapp/admin/google/status');
+          const status = data.status || {};
+          const connected = Boolean(status.connected);
+          const badge = connected
+            ? '<span class="oauth-badge ok">Подключено</span>'
+            : '<span class="oauth-badge err">Ошибка подключения</span>';
+          const lines = [
+            badge,
+            '<div><strong>Calendar ID:</strong> ' + (status.calendar_id || '-') + '</div>'
+          ];
+          if (!connected && status.error_message) {
+            lines.push('<div class="err"><strong>Ошибка:</strong> ' + status.error_message + '</div>');
+          }
+          els.oauthStatusBox.innerHTML = lines.join('');
+        } catch (error) {
+          els.oauthStatusBox.innerHTML =
+            '<span class="oauth-badge err">Ошибка подключения</span><div class="err">Не удалось получить статус OAuth</div>';
+        }
+      }
+
       async function bootstrap() {
         const initData = tg && tg.initData ? tg.initData : '';
         let auth = null;
@@ -1006,6 +1051,7 @@ export function renderMiniAppHtml(): string {
             await runAutoCleanupIfEnabled();
             await loadAdminRequests();
             await loadAdminSettings();
+            await loadGoogleOAuthStatus();
           }
           switchTab(btn.dataset.tab);
         });
@@ -1159,6 +1205,9 @@ export function renderMiniAppHtml(): string {
           })
         });
         alert('Настройки сохранены');
+      });
+      document.getElementById('btnReloadOAuthStatus').addEventListener('click', async () => {
+        await loadGoogleOAuthStatus();
       });
 
       els.btnCloseOnboarding.addEventListener('click', () => {
